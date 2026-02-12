@@ -7,9 +7,6 @@
     <title>Honeypot Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Leaflet Map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -57,6 +54,10 @@
             animation: blinker 1.5s linear infinite;
         }
 
+        .blink-fast {
+            animation: blinker 0.5s linear infinite;
+        }
+
         @keyframes blinker {
             50% {
                 opacity: 0;
@@ -64,12 +65,44 @@
         }
 
         /* Map Customization */
-        .leaflet-map-pane {
-            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        .map-container {
+            background-image: url('/static/india_map.png');
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            /* Invert filtering to make a white map look dark cyan/blue */
+            filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2);
+            position: relative;
+            width: 100%;
+            height: 100%;
         }
 
-        .leaflet-control-container .leaflet-attribution-flag {
-            display: none !important;
+        /* Dots on the map - we have to counter-scale the filter so they look red/cyan */
+        .map-dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            /* Revert the parent's filter so colors are accurate */
+            filter: invert(1) hue-rotate(180deg) brightness(1.2) contrast(1);
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .dot-honeypot {
+            background-color: #06b6d4;
+            /* Cyan */
+            color: #06b6d4;
+            /* Approximate Bangalore location */
+            bottom: 25%;
+            left: 45%;
+        }
+
+        .dot-threat {
+            background-color: #ef4444;
+            /* Red */
+            color: #ef4444;
+            /* Will be positioned dynamically */
         }
     </style>
 </head>
@@ -82,7 +115,7 @@
                 <div class="w-3 h-3 bg-cyan-400 rounded-full blink"></div>
                 <div>
                     <h1 class="text-2xl font-bold tracking-wider neon-text text-cyan-400">AGENTIC HONEYPOT <span
-                            class="text-xs text-cyan-700 ml-2">v2.1.0</span></h1>
+                            class="text-xs text-cyan-700 ml-2">v2.1.1</span></h1>
                     <p class="text-xs text-slate-400">REAL-TIME THREAT INTELLIGENCE SYSTEM</p>
                 </div>
             </div>
@@ -133,11 +166,28 @@
                     </div>
                 </div>
 
-                <!-- World Map (Leaflet) -->
+                <!-- India Map -->
                 <div class="glass p-4 rounded-lg flex-1 relative overflow-hidden flex flex-col">
                     <h3 class="text-cyan-400 text-xs font-bold mb-2 z-10">THREAT GEO-LOCATION <span
                             class="text-slate-500 ml-2">(LIVE)</span></h3>
-                    <div id="map" class="flex-1 w-full h-full rounded bg-slate-900 border border-slate-700"></div>
+                    <div
+                        class="flex-1 w-full h-full rounded bg-slate-900 border border-slate-700 overflow-hidden relative">
+                        <div class="map-container" id="india-map">
+                            <!-- Honeypot Location (Bangalore-ish) -->
+                            <div class="map-dot dot-honeypot blink"></div>
+                            <!-- Threats will be appended here -->
+                        </div>
+                    </div>
+                    <!-- Legend -->
+                    <div
+                        class="absolute bottom-4 right-4 flex gap-3 text-[10px] bg-slate-900/80 p-2 rounded border border-slate-700">
+                        <div class="flex items-center gap-1">
+                            <div class="w-2 h-2 rounded-full bg-cyan-500"></div> Honeypot
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <div class="w-2 h-2 rounded-full bg-red-500"></div> Threat
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -203,79 +253,45 @@
             }
         });
 
-        // --- 2. Leaflet Map Setup (India Focus) ---
-        const map = L.map('map', {
-            zoomControl: false,
-            attributionControl: false
-        }).setView([22.5937, 78.9629], 4); // Center on India
-
-        // Dark Matter Tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19
-        }).addTo(map);
-
-        // Add a pulsing marker for "Listening Station"
-        const icon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div class='w-3 h-3 bg-cyan-500 rounded-full blink border-2 border-white shadow-[0_0_10px_#06b6d4]'></div>",
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        });
-        const honeypotLoc = [12.9716, 77.5946];
-        L.marker(honeypotLoc, { icon: icon }).addTo(map).bindPopup("Honeypot Server (Bangalore)");
-
-        // Simulated Scam Hotspots for Demo Visualization
-        const scamHotspots = [
-            [24.2185, 86.6995], // Jamtara (The Phishing Capital)
-            [28.6139, 77.2090], // Delhi
-            [19.0760, 72.8777], // Mumbai
-            [22.5726, 88.3639], // Kolkata
-            [26.9124, 75.7873], // Jaipur
-            [55.7558, 37.6173], // Moscow (International)
-            [6.5244, 3.3792],   // Lagos
-        ];
-
+        // --- 2. Live Data Update ---
         let lastAttackCount = 0;
 
-        // --- 3. Live Data Update ---
+        // Approx CSS positions (Top%, Left%) for India map
+        const threatLocations = [
+            { top: '35%', left: '35%' }, // Delhi/North
+            { top: '55%', left: '25%' }, // Mumbai/West
+            { top: '45%', left: '70%' }, // Kolkata/East
+            { top: '40%', left: '60%' }, // Jamtara/Jharkhand
+            { top: '35%', left: '40%' }, // UP
+        ];
+
         function updateStats() {
             fetch('/api/stats')
                 .then(response => response.json())
                 .then(data => {
-                    // Update KPI numbers with animation effect
+                    // Update KPI
                     document.getElementById('total-attacks').innerText = data.total_messages;
                     document.getElementById('scams-detected').innerText = data.scams_detected;
                     document.getElementById('intel-count').innerText = data.total_intelligence;
                     document.getElementById('money-saved').innerText = (data.scams_detected * 5000).toLocaleString();
 
-                    // Map Visualization: If new attacks/messages, show a threat line
+                    // Visual Threat on Map
                     if (data.total_messages > lastAttackCount) {
                         lastAttackCount = data.total_messages;
 
-                        // Pick a random source
-                        const source = scamHotspots[Math.floor(Math.random() * scamHotspots.length)];
+                        // Pick random location
+                        const loc = threatLocations[Math.floor(Math.random() * threatLocations.length)];
 
-                        // Add Red Marker (Attacker)
-                        const threatIcon = L.divIcon({
-                            className: 'threat-icon',
-                            html: "<div class='w-2 h-2 bg-red-500 rounded-full blink shadow-[0_0_10px_#ef4444]'></div>",
-                            iconSize: [10, 10]
-                        });
-                        const marker = L.marker(source, { icon: threatIcon }).addTo(map);
+                        // Create Dot
+                        const dot = document.createElement('div');
+                        dot.className = 'map-dot dot-threat blink-fast';
+                        dot.style.top = loc.top;
+                        dot.style.left = loc.left;
 
-                        // Draw Line
-                        const line = L.polyline([source, honeypotLoc], {
-                            color: '#ef4444',
-                            weight: 1,
-                            opacity: 0.6,
-                            dashArray: '5, 10'
-                        }).addTo(map);
+                        document.getElementById('india-map').appendChild(dot);
 
-                        // Remove after 3 seconds to keep map clean
-                        setTimeout(() => {
-                            map.removeLayer(marker);
-                            map.removeLayer(line);
-                        }, 3000);
+                        // Remove after 4s
+                        setTimeout(() => dot.remove(), 4000);
                     }
 
                     // Update Logs
@@ -308,10 +324,9 @@
                         intelList.prepend(div);
                     });
 
-                    // Mock Graph Update (Add slight randomness to look "alive")
+                    // Graph Update
                     const currentData = trafficChart.data.datasets[0].data;
                     currentData.shift();
-                    // Base value on total messages + random jitter
                     const newValue = (data.total_messages % 10) + Math.random() * 5;
                     currentData.push(newValue);
                     trafficChart.update();
