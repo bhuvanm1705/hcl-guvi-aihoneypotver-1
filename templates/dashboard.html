@@ -36,7 +36,6 @@
             background-size: 20px 20px;
         }
 
-        /* Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -48,10 +47,6 @@
         ::-webkit-scrollbar-thumb {
             background: #334155;
             border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
         }
 
         .blink {
@@ -83,7 +78,6 @@
             animation: flash-red 1s ease-in-out infinite;
         }
 
-        /* Map Container */
         #interactive-map {
             width: 100%;
             height: 100%;
@@ -91,7 +85,6 @@
             z-index: 1;
         }
 
-        /* Custom Leaflet Controls */
         .leaflet-control-zoom a {
             background-color: rgba(15, 23, 42, 0.9) !important;
             color: #22d3ee !important;
@@ -115,7 +108,6 @@
             background: #06b6d4;
         }
 
-        /* Custom Markers */
         .custom-div-icon {
             background: transparent;
             border: none;
@@ -135,7 +127,6 @@
             border: 2px solid white;
         }
 
-        /* Threat Pulse */
         .pin-red {
             background: #ef4444;
             color: #ef4444;
@@ -168,138 +159,176 @@
             }
         }
 
-        /* User Location Pulse */
         .pin-blue {
             background: #3b82f6;
             color: #3b82f6;
             border: 2px solid white;
             box-shadow: 0 0 20px #3b82f6;
         }
+
+        /* Tactic Badge */
+        .tactic-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 4px;
+            border: 1px solid;
+        }
+
+        .tactic-urgency {
+            border-color: #ef4444;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .tactic-fear {
+            border-color: #a855f7;
+            color: #a855f7;
+            background: rgba(168, 85, 247, 0.1);
+        }
+
+        .tactic-reward {
+            border-color: #eab308;
+            color: #eab308;
+            background: rgba(234, 179, 8, 0.1);
+        }
+
+        .tactic-authority {
+            border-color: #3b82f6;
+            color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
     </style>
 </head>
 
-<body class="text-cyan-50 min-h-screen grid-bg overflow-hidden">
-    <div class="h-screen flex flex-col p-4">
-        <!-- Header -->
-        <header class="flex justify-between items-center mb-4 px-2">
-            <div class="flex items-center gap-3">
-                <div class="w-3 h-3 bg-cyan-400 rounded-full blink"></div>
-                <div>
-                    <h1 class="text-2xl font-bold tracking-wider neon-text text-cyan-400">AGENTIC HONEYPOT <span
-                            class="text-xs text-cyan-700 ml-2">v3.0.0-REAL-MAP</span></h1>
-                    <p class="text-xs text-slate-400">DEPLOYMENT ID: <span id="deploy-time"
-                            class="text-yellow-500 font-bold">LOADING...</span></p>
+<body class="text-cyan-50 min-h-screen grid-bg overflow-hidden flex flex-col p-4">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-4 px-2">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 bg-cyan-400 rounded-full blink"></div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-wider neon-text text-cyan-400">AGENTIC HONEYPOT <span
+                        class="text-xs text-cyan-700 ml-2">v4.0-JUDGE-READY</span></h1>
+                <p class="text-xs text-slate-400">DEPLOYMENT ID: <span id="deploy-time"
+                        class="text-yellow-500 font-bold">LOADING...</span></p>
+            </div>
+        </div>
+        <div class="glass px-4 py-2 rounded flex gap-6 text-xs bg-slate-900/50">
+            <div>SERVER: <span class="text-green-400">ONLINE</span></div>
+            <div>AGENTS: <span class="text-green-400">ACTIVE</span></div>
+            <div>MODE: <span class="text-purple-400">OFFENSIVE DEFENSE</span></div>
+        </div>
+    </header>
+
+    <!-- KPI Grid -->
+    <div class="grid grid-cols-4 gap-4 mb-4">
+        <div class="glass p-4 rounded-lg border-l-4 border-cyan-500">
+            <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Total Intercepts</h3>
+            <p class="text-3xl font-bold text-white mb-0" id="total-attacks">0</p>
+            <div class="text-[10px] text-cyan-500 mt-1">▲ LIVE TRAFFIC</div>
+        </div>
+        <div class="glass p-4 rounded-lg border-l-4 border-red-500">
+            <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Active Threats</h3>
+            <p class="text-3xl font-bold text-red-400 mb-0" id="scams-detected">0</p>
+            <div class="text-[10px] text-red-500 mt-1">BLOCKED & ENGAGED</div>
+        </div>
+        <div class="glass p-4 rounded-lg border-l-4 border-yellow-500">
+            <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Intel Extracted</h3>
+            <p class="text-3xl font-bold text-yellow-400 mb-0" id="intel-count">0</p>
+            <div class="text-[10px] text-yellow-500 mt-1">UPI / PHONE / LINKS</div>
+        </div>
+        <!-- NEW: Dynamic Risk Score -->
+        <div class="glass p-4 rounded-lg border-l-4 border-purple-500 relative overflow-hidden">
+            <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Current Risk Score</h3>
+            <div class="flex items-baseline gap-2">
+                <p class="text-4xl font-bold text-purple-400 mb-0" id="risk-score-display">0</p>
+                <span class="text-xs text-slate-500">/ 100</span>
+            </div>
+            <div class="absolute right-2 top-2 bottom-2 w-2 bg-slate-800 rounded overflow-hidden">
+                <div id="risk-bar" class="w-full bg-purple-500 transition-all duration-1000 bottom-0 absolute"
+                    style="height: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Area -->
+    <div class="grid grid-cols-12 gap-4 flex-1 min-h-0">
+
+        <!-- Left: Threat Intelligence & Map -->
+        <div class="col-span-8 flex flex-col gap-4 min-h-0 h-full">
+
+            <!-- Analysis Panel (Context Aware) -->
+            <div class="glass p-4 rounded-lg h-1/4 relative flex flex-col overflow-hidden" id="analysis-panel">
+                <div class="flex justify-between items-start z-10">
+                    <div>
+                        <h3 class="text-cyan-400 text-xs font-bold mb-1">LIVE THREAT ANALYTICS</h3>
+                        <h2 class="text-2xl font-bold text-white mb-1" id="scam-type-display">WAITING FOR SIGNAL...</h2>
+                        <div id="tactics-container" class="flex gap-2 mt-2">
+                            <!-- Badges go here -->
+                        </div>
+                    </div>
+                    <!-- Risk Graph (Small) -->
+                    <div class="w-1/3 h-full absolute right-0 top-0 bottom-0 p-2 opacity-50">
+                        <canvas id="riskChart"></canvas>
+                    </div>
                 </div>
             </div>
-            <div class="glass px-4 py-2 rounded flex gap-6 text-xs bg-slate-900/50">
-                <div>SERVER: <span class="text-green-400">ONLINE</span></div>
-                <div>GPS: <span class="text-blue-400" id="gps-status">LOCATING...</span></div>
-                <div>AGENTS: <span class="text-green-400">ACTIVE</span></div>
-            </div>
-        </header>
 
-        <!-- KPI Grid -->
-        <div class="grid grid-cols-4 gap-4 mb-4">
-            <div class="glass p-4 rounded-lg border-l-4 border-cyan-500">
-                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Total Hits</h3>
-                <p class="text-3xl font-bold text-white mb-0" id="total-attacks">0</p>
-                <div class="text-[10px] text-cyan-500 mt-1">▲ LIVE TRAFFIC</div>
-            </div>
-            <div class="glass p-4 rounded-lg border-l-4 border-red-500">
-                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Threats Blocked</h3>
-                <p class="text-3xl font-bold text-red-400 mb-0" id="scams-detected">0</p>
-                <div class="text-[10px] text-red-500 mt-1">HIGH SEVERITY</div>
-            </div>
-            <div class="glass p-4 rounded-lg border-l-4 border-yellow-500">
-                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Intel Items</h3>
-                <p class="text-3xl font-bold text-yellow-400 mb-0" id="intel-count">0</p>
-                <div class="text-[10px] text-yellow-500 mt-1">DATAPOINTS EXTRACTED</div>
-            </div>
-            <div class="glass p-4 rounded-lg border-l-4 border-emerald-500">
-                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Est. Value Saved</h3>
-                <p class="text-3xl font-bold text-emerald-400 mb-0">₹<span id="money-saved">0</span></p>
-                <div class="text-[10px] text-emerald-500 mt-1">BASED ON AVG LOSS</div>
+            <!-- Map -->
+            <div class="glass p-0 rounded-lg flex-1 relative overflow-hidden flex flex-col transition-all duration-300 border border-slate-700"
+                id="map-panel">
+                <div id="interactive-map"></div>
+                <!-- Overlay Info -->
+                <div
+                    class="absolute bottom-4 left-4 z-[500] bg-slate-900/90 p-2 rounded border border-cyan-500/30 text-[10px]">
+                    <div class="text-cyan-400 font-bold">GPS TRACKING ACTIVE</div>
+                    <div class="text-slate-400">LAT: <span id="gps-lat">...</span> LON: <span id="gps-lon">...</span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Main Dashboard Area -->
-        <div class="grid grid-cols-12 gap-4 flex-1 min-h-0">
-
-            <!-- Left Column: Traffic Graph & Map -->
-            <div class="col-span-8 flex flex-col gap-4 min-h-0 h-full">
-                <!-- Traffic Graph -->
-                <div class="glass p-4 rounded-lg h-1/4 relative flex flex-col">
-                    <h3 class="text-cyan-400 text-xs font-bold mb-2 flex justify-between">
-                        <span>NETWORK TRAFFIC ANALYSIS</span>
-                        <span class="text-[10px] text-slate-500">REQ/SEC</span>
-                    </h3>
-                    <div class="relative flex-1 min-h-0 w-full">
-                        <canvas id="trafficChart"></canvas>
+        <!-- Right: Logs & Intel -->
+        <div class="col-span-4 flex flex-col gap-4 min-h-0 h-full">
+            <div class="glass p-0 rounded-lg flex flex-col flex-1 overflow-hidden">
+                <div class="bg-slate-900/80 p-2 border-b border-slate-700 flex justify-between items-center">
+                    <span class="text-xs text-slate-400">SYSTEM LOGS</span>
+                    <div class="flex gap-1">
+                        <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                     </div>
                 </div>
-
-                <!-- Interactive India Map -->
-                <div class="glass p-4 rounded-lg flex-1 relative overflow-hidden flex flex-col transition-all duration-300"
-                    id="map-panel">
-                    <h3
-                        class="text-cyan-400 text-xs font-bold mb-2 z-10 flex justify-between absolute top-4 left-4 right-4 pointer-events-none">
-                        <span>THREAT GEO-LOCATION <span class="text-slate-500 ml-2">(GPS ENABLED)</span></span>
-                        <span id="sync-status" class="text-[10px] text-slate-600">CONNECTED</span>
-                    </h3>
-
-                    <!-- Leaflet Container -->
-                    <div id="interactive-map"></div>
+                <div class="p-3 overflow-y-auto font-mono text-[11px] space-y-1 flex-1 h-full scrollbar-thin"
+                    id="activity-log">
+                    <div class="text-slate-500">System initialized...</div>
                 </div>
             </div>
 
-            <!-- Right Column: Logs & Intel -->
-            <div class="col-span-4 flex flex-col gap-4 min-h-0 h-full">
-                <!-- Terminal Feed -->
-                <div class="glass p-0 rounded-lg flex flex-col flex-1 overflow-hidden">
-                    <div class="bg-slate-900/80 p-2 border-b border-slate-700 flex justify-between items-center">
-                        <span class="text-xs text-slate-400">SYSTEM LOGS</span>
-                        <div class="flex gap-1">
-                            <div class="w-2 h-2 rounded-full bg-slate-600"></div>
-                            <div class="w-2 h-2 rounded-full bg-slate-600"></div>
-                        </div>
-                    </div>
-                    <div class="p-3 overflow-y-auto font-mono text-[11px] space-y-1 flex-1 h-full" id="activity-log">
-                        <div class="text-slate-500">Initializing system daemon...</div>
-                        <div class="text-slate-500">Listening on port 8080...</div>
-                    </div>
-                </div>
-
-                <!-- Live Intel -->
-                <div class="glass p-4 rounded-lg h-1/3 flex flex-col">
-                    <h3 class="text-yellow-400 text-xs font-bold mb-3">CAPTURED DATA</h3>
-                    <div class="overflow-y-auto space-y-2 flex-1 scrollbar-hide" id="intel-list">
-                        <!-- Items -->
-                    </div>
-                </div>
+            <div class="glass p-4 rounded-lg h-1/3 flex flex-col">
+                <h3 class="text-yellow-400 text-xs font-bold mb-3">EXTRACTED EVIDENCE</h3>
+                <div class="overflow-y-auto space-y-2 flex-1" id="intel-list"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Set Deployment Timestamp (Debug for user)
+        // Init
         const now = new Date();
         document.getElementById('deploy-time').innerText = now.toLocaleTimeString();
 
-        // --- 1. Traffic Chart Setup ---
-        const ctx = document.getElementById('trafficChart').getContext('2d');
-        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, 'rgba(6, 182, 212, 0.5)'); // Cyan
-        gradient.addColorStop(1, 'rgba(6, 182, 212, 0)');
-
-        const trafficChart = new Chart(ctx, {
+        // --- Charts ---
+        const ctxRisk = document.getElementById('riskChart').getContext('2d');
+        const riskChart = new Chart(ctxRisk, {
             type: 'line',
             data: {
                 labels: Array(20).fill(''),
                 datasets: [{
-                    label: 'Requests',
+                    label: 'Risk Score',
                     data: Array(20).fill(0),
-                    borderColor: '#22d3ee',
-                    backgroundColor: gradient,
+                    borderColor: '#a855f7',
+                    backgroundColor: 'rgba(168, 85, 247, 0.2)',
                     borderWidth: 2,
                     fill: true,
                     tension: 0.4,
@@ -310,185 +339,120 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: { display: true, grid: { color: 'rgba(51, 65, 85, 0.3)' }, beginAtZero: true }
-                },
+                scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } },
                 animation: { duration: 0 }
             }
         });
 
-        // --- 2. Leaflet Map Setup (REAL MAP) ---
-        // Center on India
-        const map = L.map('interactive-map', {
-            zoomControl: true,
-            attributionControl: false
-        }).setView([20.5937, 78.9629], 5); // India Center
+        // --- Map Setup ---
+        const map = L.map('interactive-map', { zoomControl: true, attributionControl: false }).setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
 
-        // Dark Matter Tiles (Cyberpunk Style)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19,
-            subdomains: 'abcd'
-        }).addTo(map);
-
-        // Restrict bounds to India + surroundings
-        const southWest = L.latLng(5.0, 68.0);
-        const northEast = L.latLng(38.0, 98.0);
-        const bounds = L.latLngBounds(southWest, northEast);
-        map.setMaxBounds(bounds);
+        // Bounds
+        map.setMaxBounds([[5.0, 68.0], [38.0, 98.0]]);
         map.setMinZoom(4);
 
-        // Custom Icons
-        const honeypotIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div class='marker-pin pin-cyan'></div>",
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        });
+        // Icons
+        const icons = {
+            cyan: L.divIcon({ className: 'custom-div-icon', html: "<div class='marker-pin pin-cyan'></div>", iconSize: [20, 20] }),
+            red: L.divIcon({ className: 'custom-div-icon', html: "<div class='marker-pin pin-red'></div>", iconSize: [20, 20] }),
+            blue: L.divIcon({ className: 'custom-div-icon', html: "<div class='marker-pin pin-blue'></div>", iconSize: [20, 20] })
+        };
 
-        const threatIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div class='marker-pin pin-red'></div>",
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        });
-
-        const userIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div class='marker-pin pin-blue'></div>",
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        });
-
-        // --- 3. Locate User (Honeypot Location) ---
+        // GPS
         map.locate({ setView: true, maxZoom: 6 });
+        map.on('locationfound', e => {
+            L.marker(e.latlng, { icon: icons.blue }).addTo(map).bindPopup("<b>HQ (YOU)</b>").openPopup();
+            document.getElementById('gps-lat').innerText = e.latlng.lat.toFixed(4);
+            document.getElementById('gps-lon').innerText = e.latlng.lng.toFixed(4);
+        });
 
-        function onLocationFound(e) {
-            L.marker(e.latlng, { icon: userIcon }).addTo(map)
-                .bindPopup("<b>HONEYPOT SERVER (YOU)</b><br>Status: Active<br>Monitoring...").openPopup();
+        // --- Live Data ---
+        let lastRiskScore = 0;
+        let lastMsgCount = 0;
 
-            L.circle(e.latlng, {
-                radius: e.accuracy / 2,
-                color: '#3b82f6',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.1
-            }).addTo(map);
-
-            document.getElementById('gps-status').innerText = "LOCKED";
-        }
-
-        function onLocationError(e) {
-            document.getElementById('gps-status').innerText = "DENIED (USING DEFAULT)";
-            // Fallback to Bangalore
-            L.marker([12.9716, 77.5946], { icon: userIcon }).addTo(map)
-                .bindPopup("<b>HONEYPOT SERVER</b><br>Loc: Bangalore (Fallback)").openPopup();
-        }
-
-        map.on('locationfound', onLocationFound);
-        map.on('locationerror', onLocationError);
-
-
-        // --- 4. Live Data Update ---
-        let lastAttackCount = 0;
-
-        // REAL COORDINATES for Threats
-        const threatLocations = [
-            { lat: 28.6139, lng: 77.2090, name: "New Delhi", state: "Delhi" },
-            { lat: 19.0760, lng: 72.8777, name: "Mumbai", state: "Maharashtra" },
-            { lat: 22.5726, lng: 88.3639, name: "Kolkata", state: "West Bengal" },
-            { lat: 24.1667, lng: 86.6000, name: "Jamtara", state: "Jharkhand (Hotspot)" },
-            { lat: 26.8467, lng: 80.9462, name: "Lucknow", state: "Uttar Pradesh" },
-            { lat: 12.9242, lng: 80.1292, name: "Tambaram", state: "Tamil Nadu" },
-            { lat: 23.0225, lng: 72.5714, name: "Ahmedabad", state: "Gujarat" }
+        // Mock Threat Locations
+        const threats = [
+            { lat: 28.61, lng: 77.20, name: "New Delhi" }, { lat: 19.07, lng: 72.87, name: "Mumbai" },
+            { lat: 22.57, lng: 88.36, name: "Kolkata" }, { lat: 24.16, lng: 86.60, name: "Jamtara" },
+            { lat: 12.97, lng: 77.59, name: "Bangalore" }
         ];
 
+        function getTacticBadge(tactic) {
+            const map = { 'Urgency': 'tactic-urgency', 'Fear': 'tactic-fear', 'Greed': 'tactic-reward', 'Reward': 'tactic-reward', 'Authority': 'tactic-authority' };
+            const cls = map[tactic] || 'tactic-authority';
+            return `<span class="tactic-badge ${cls}">${tactic.toUpperCase()}</span>`;
+        }
+
         function updateStats() {
-            const syncText = document.getElementById('sync-status');
-            syncText.innerText = "SYNCING...";
-
             fetch('/api/stats')
-                .then(response => response.json())
+                .then(res => res.json())
                 .then(data => {
-                    syncText.innerText = "LIVE";
-
-                    // Update KPI
+                    // 1. Basic KPI
                     document.getElementById('total-attacks').innerText = data.total_messages;
                     document.getElementById('scams-detected').innerText = data.scams_detected;
                     document.getElementById('intel-count').innerText = data.total_intelligence;
-                    document.getElementById('money-saved').innerText = (data.scams_detected * 5000).toLocaleString();
 
-                    // Visual Threat on Map
-                    if (data.total_messages > lastAttackCount) {
-                        lastAttackCount = data.total_messages;
+                    // 2. Risk Score & Graph
+                    const currentRisk = data.latest_threat ? data.latest_threat.risk : 0;
+                    document.getElementById('risk-score-display').innerText = currentRisk;
+                    document.getElementById('risk-bar').style.height = `${currentRisk}%`;
 
-                        // 1. TRIGGER RED FLASH ALERT
-                        const mapPanel = document.getElementById('map-panel');
-                        mapPanel.classList.add('flash-alert');
-                        setTimeout(() => mapPanel.classList.remove('flash-alert'), 3000);
+                    // Update Graph
+                    const chartData = riskChart.data.datasets[0].data;
+                    chartData.shift();
+                    chartData.push(currentRisk);
+                    riskChart.update();
 
-                        // 2. Pick random location
-                        const threat = threatLocations[Math.floor(Math.random() * threatLocations.length)];
+                    // 3. Thread Analysis Panel
+                    if (data.latest_threat && currentRisk > 30) {
+                        document.getElementById('scam-type-display').innerText = data.latest_threat.type.toUpperCase();
+                        document.getElementById('scam-type-display').className = "text-2xl font-bold text-red-500 mb-1 animate-pulse";
 
-                        // 3. Add PERSISTENT Marker to Map (Doesn't disappear)
-                        const marker = L.marker([threat.lat, threat.lng], { icon: threatIcon }).addTo(map);
+                        // Tactics
+                        const tacticsHtml = (data.latest_threat.tactics || []).map(getTacticBadge).join('');
+                        document.getElementById('tactics-container').innerHTML = tacticsHtml;
 
-                        // 4. Bind Popup with Details
-                        marker.bindPopup(`
-                            <div class="text-left">
-                                <b class="text-red-400">THREAT DETECTED</b><br>
-                                Loc: ${threat.name}<br>
-                                State: ${threat.state}<br>
-                                Coords: ${threat.lat}, ${threat.lng}<br>
-                                <span class="text-xs text-slate-400">Status: BLOCKED</span>
-                            </div>
-                        `).openPopup();
+                        // Flash Map if new
+                        if (data.total_messages > lastMsgCount) {
+                            document.getElementById('map-panel').classList.add('flash-alert');
+                            setTimeout(() => document.getElementById('map-panel').classList.remove('flash-alert'), 1000);
+
+                            // Plot Threat
+                            const loc = threats[Math.floor(Math.random() * threats.length)];
+                            L.marker([loc.lat, loc.lng], { icon: icons.red }).addTo(map)
+                                .bindPopup(`<b>${data.latest_threat.type}</b><br>Risk: ${currentRisk}<br>Loc: ${loc.name}`).openPopup();
+                        }
+                    } else {
+                        document.getElementById('scam-type-display').innerText = "MONITORING NETWORK...";
+                        document.getElementById('scam-type-display').className = "text-2xl font-bold text-slate-600 mb-1";
+                        document.getElementById('tactics-container').innerHTML = "";
                     }
+                    lastMsgCount = data.total_messages;
 
-                    // Update Logs
+                    // 4. Logs
                     const logContainer = document.getElementById('activity-log');
                     logContainer.innerHTML = '';
                     data.recent_logs.forEach(log => {
                         const div = document.createElement('div');
-                        const isScam = log.is_scam;
-                        const colorClass = isScam ? 'text-red-400' : 'text-slate-300';
-                        const prefix = isScam ? '[ALERT]' : '[INFO]';
-
-                        div.className = `${colorClass} border-b border-slate-800/50 pb-1 mb-1`;
-                        div.innerHTML = `<span class="opacity-50">${log.time}</span> <span class="font-bold">${prefix}</span> ${log.message}`;
-                        logContainer.prepend(div);
+                        const color = log.is_scam ? (log.risk_score > 70 ? 'text-red-500 font-bold' : 'text-orange-400') : 'text-slate-400';
+                        div.className = `${color} border-b border-slate-800/50 pb-1 mb-1`;
+                        div.innerHTML = `<span class="opacity-50">${log.time}</span> ${log.message}`;
+                        logContainer.append(div);
                     });
 
-                    // Update Intel
+                    // 5. Intel
                     const intelList = document.getElementById('intel-list');
                     intelList.innerHTML = '';
                     data.recent_intelligence.forEach(item => {
                         const div = document.createElement('div');
-                        div.className = 'bg-slate-900/80 p-2 rounded border-l-2 ' + (item.type === 'UPI' ? 'border-purple-500' : 'border-yellow-500');
-                        div.innerHTML = `
-                            <div class="flex justify-between text-[10px] text-slate-400">
-                                <span>TYPE: ${item.type}</span>
-                                <span>CONF: 100%</span>
-                            </div>
-                            <div class="text-xs font-mono text-white mt-1 select-all">${item.value}</div>
-                        `;
-                        intelList.prepend(div);
+                        div.className = 'bg-slate-900/80 p-2 rounded border-l-2 mb-1 ' + (item.type === 'UPI-ID' ? 'border-purple-500' : 'border-yellow-500');
+                        div.innerHTML = `<span class="text-[10px] text-slate-500 block">${item.type}</span><span class="text-xs font-mono text-white select-all">${item.value}</span>`;
+                        intelList.append(div);
                     });
-
-                    // Graph Update
-                    const currentData = trafficChart.data.datasets[0].data;
-                    currentData.shift();
-                    const newValue = (data.total_messages % 10) + Math.random() * 5;
-                    currentData.push(newValue);
-                    trafficChart.update();
-                })
-                .catch(err => {
-                    console.error(err);
-                    syncText.innerText = "OFFLINE";
-                    syncText.classList.add('text-red-500');
                 });
         }
-
-        setInterval(updateStats, 1500); // Faster polling (1.5s)
+        setInterval(updateStats, 1000);
         updateStats();
     </script>
 </body>

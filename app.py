@@ -63,6 +63,8 @@ if GROQ_API_KEY:
         logger.warning(f"Groq API test failed: {e}")
         logger.info("Falling back to rule-based responses")
 
+import random
+
 @dataclass
 class ExtractedIntelligence:
     bankAccounts: List[str]
@@ -70,26 +72,44 @@ class ExtractedIntelligence:
     phishingLinks: List[str]
     phoneNumbers: List[str]
     suspiciousKeywords: List[str]
+    tactics: List[str] = None  # New Field
+    scamType: str = "Unknown"  # New Field
+    riskScore: int = 0         # New Field
+
+class RiskEngine:
+    """Calculates a dynamic risk score (0-100) based on accumulated indicators"""
+    @staticmethod
+    def calculate_score(is_scam: bool, intel: ExtractedIntelligence, message_text: str) -> int:
+        score = 0
+        text = message_text.lower()
+
+        # 1. Base Score
+        if is_scam: score += 30
+
+        # 2. Hard Evidence (High Impact)
+        if intel.upiIds: score += 25
+        if intel.phishingLinks: score += 25
+        if intel.bankAccounts: score += 25
+        if intel.phoneNumbers: score += 15
+
+        # 3. Behavioral/Tactic Indicators (Medium Impact)
+        if any(t in text for t in ['urgent', 'immediately', 'block', 'suspend']): score += 10
+        if any(t in text for t in ['offer', 'lottery', 'bonus', 'job']): score += 10
+        
+        # 4. Contextual
+        if len(intel.tactics or []) > 0: score += 10
+
+        # Cap at 100
+        return min(100, score)
 
 class ScamDetector:
     def __init__(self):
         self.scam_patterns = [
-            r'account.*block',
-            r'account.*compromised',
-            r'account.*suspend',
-            r'verify.*immediately',
-            r'urgent.*action',
-            r'click.*link',
-            r'share.*otp',
-            r'share.*pin',
-            r'upi.*id',
-            r'bank.*details',
-            r'suspended.*account',
-            r'expire.*today',
-            r'confirm.*identity',
-            r'freeze.*account',
-            r'security.*verify',
-            r'provide.*account.*number'
+            r'account.*block', r'account.*compromised', r'account.*suspend',
+            r'verify.*immediately', r'urgent.*action', r'click.*link',
+            r'share.*otp', r'share.*pin', r'upi.*id', r'bank.*details',
+            r'suspended.*account', r'expire.*today', r'confirm.*identity',
+            r'freeze.*account', r'security.*verify', r'provide.*account.*number'
         ]
         
         self.scam_keywords = [
@@ -98,6 +118,17 @@ class ScamDetector:
             'debit card', 'atm', 'pin', 'cvv', 'security code', 'compromised',
             'freeze', 'permanently', 'act now'
         ]
+
+    def classify_scam_type(self, text: str, intel: ExtractedIntelligence) -> str:
+        """Simple rule-based classification (LLM can override later)"""
+        text = text.lower()
+        if intel.upiIds or 'upi' in text: return "UPI Fraud"
+        if intel.bankAccounts or 'otp' in text or 'kyc' in text: return "Bank/KYC Fraud"
+        if 'job' in text or 'hiring' in text: return "Job Scam"
+        if 'investment' in text or 'returns' in text or 'crypto' in text: return "Investment Scam"
+        if 'loan' in text or 'credit' in text: return "Loan Fraud"
+        if intel.phishingLinks: return "Phishing Link"
+        return "General Suspicion"
     
     def detect_scam(self, message: str) -> Tuple[bool, float]:
         """Detect if a message is a scam and return confidence score"""
@@ -129,30 +160,24 @@ class ScamDetector:
 class IntelligenceExtractor:
     def __init__(self):
         self.patterns = {
-            'bankAccounts': [
-                r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b',
-                r'\b\d{10,18}\b'
-            ],
-            'upiIds': [
-                r'\b[\w\.-]+@[\w\.-]+\b'
-            ],
-            'phishingLinks': [
-                r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-            ],
-            'phoneNumbers': [
-                r'\+91[-\s]?\d{10}',
-                r'\b\d{10}\b'
-            ]
+            'bankAccounts': [r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b', r'\b\d{10,18}\b'],
+            'upiIds': [r'\b[\w\.-]+@[\w\.-]+\b'],
+            'phishingLinks': [r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'],
+            'phoneNumbers': [r'\+91[-\s]?\d{10}', r'\b\d{10}\b']
+        }
+        
+        self.tactic_keywords = {
+            'Urgency': ['urgent', 'immediately', 'now', 'today', 'expire', 'deadline'],
+            'Fear': ['police', 'block', 'suspend', 'arrest', 'illegal', 'fail'],
+            'Greed/Reward': ['lottery', 'winner', 'bonus', 'cashback', 'prize'],
+            'Authority': ['bank manager', 'police officer', 'tax department', 'fbi', 'cbi']
         }
     
     def extract_from_text(self, text: str) -> ExtractedIntelligence:
         """Extract intelligence from text"""
         intelligence = ExtractedIntelligence(
-            bankAccounts=[],
-            upiIds=[],
-            phishingLinks=[],
-            phoneNumbers=[],
-            suspiciousKeywords=[]
+            bankAccounts=[], upiIds=[], phishingLinks=[], phoneNumbers=[], 
+            suspiciousKeywords=[], tactics=[], scamType="Unknown", riskScore=0
         )
         
         # Extract using patterns
@@ -162,15 +187,18 @@ class IntelligenceExtractor:
                 getattr(intelligence, field).extend(matches)
         
         # Extract suspicious keywords
-        scam_keywords = [
-            'urgent', 'verify', 'blocked', 'suspended', 'expire', 'immediate',
-            'otp', 'pin', 'cvv', 'account', 'bank', 'upi'
-        ]
-        
+        scam_keywords = ['urgent', 'verify', 'blocked', 'suspended', 'expire', 'immediate', 'otp', 'pin', 'cvv', 'account', 'bank', 'upi']
         for keyword in scam_keywords:
             if keyword.lower() in text.lower():
                 intelligence.suspiciousKeywords.append(keyword)
         
+        # Extract Tactics
+        found_tactics = set()
+        for tactic, keywords in self.tactic_keywords.items():
+            if any(k in text.lower() for k in keywords):
+                found_tactics.add(tactic)
+        intelligence.tactics = list(found_tactics)
+
         # Remove duplicates
         intelligence.bankAccounts = list(set(intelligence.bankAccounts))
         intelligence.upiIds = list(set(intelligence.upiIds))
@@ -182,50 +210,57 @@ class IntelligenceExtractor:
 
 import database
 
-class AgenticHoneypot:
     def __init__(self):
         self.detector = ScamDetector()
         self.extractor = IntelligenceExtractor()
         # Initialize Database
         database.init_db()
         
-        # AI Agent personas and strategies
+        # AI Agent personas (Randomized)
         self.personas = [
             "curious_user",
             "concerned_customer", 
-            "tech_naive_person"
+            "tech_naive_person",
+            "elderly_victim",
+            "busy_professional"
         ]
     
     def get_ai_response(self, message: str, conversation_history: List[Dict], persona: str = "curious_user") -> str:
         """Generate AI response using Groq or fallback to rule-based"""
-        
         if groq_client == "available":
             return self._get_groq_response(message, conversation_history, persona)
         else:
             return self._get_fallback_response(message, conversation_history)
     
     def _get_groq_response(self, message: str, conversation_history: List[Dict], persona: str) -> str:
-        """Generate response using Groq API via direct HTTP requests"""
+        """Generate response using Groq API with FULL CONTEXT MEMORY"""
         try:
             # Build conversation context
-            context = self._build_context(conversation_history, persona)
+            system_prompt = self._build_context(persona)
             
-            # Direct HTTP request to Groq API
+            # Prepare messages list with System Prompt
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # Add History (Multi-Turn Fix)
+            for msg in conversation_history:
+                role = "user" if msg.get('sender') == 'user' else "assistant"
+                # Avoid adding system messages or metadata to the prompt flow if stored in history
+                if msg.get('text'):
+                     messages.append({"role": role, "content": msg['text']})
+            
+            # Add Current Message
+            messages.append({"role": "user", "content": message})
+            
             headers = {
                 "Authorization": f"Bearer {GROQ_API_KEY}",
                 "Content-Type": "application/json"
             }
             
             payload = {
-                "messages": [
-                    {"role": "system", "content": context},
-                    {"role": "user", "content": message}
-                ],
+                "messages": messages,
                 "model": "llama-3.1-8b-instant",
                 "max_tokens": 150,
-                "temperature": 0.7,
-                "top_p": 1,
-                "stream": False
+                "temperature": 0.7
             }
             
             response = requests.post(
@@ -239,198 +274,162 @@ class AgenticHoneypot:
                 result = response.json()
                 return result["choices"][0]["message"]["content"].strip()
             else:
-                logger.error(f"Groq API error: {response.status_code} - {response.text}")
+                logger.error(f"Groq API error: {response.status_code}")
                 return self._get_fallback_response(message, conversation_history)
         
         except Exception as e:
             logger.error(f"Groq API error: {e}")
             return self._get_fallback_response(message, conversation_history)
     
-    def _build_context(self, conversation_history: List[Dict], persona: str) -> str:
-        """Build context for AI agent"""
+    def _build_context(self, persona: str) -> str:
+        """Build context for AI agent based on Persona"""
         persona_contexts = {
-            "curious_user": """You are a curious but cautious person who received a suspicious message. 
-            You want to understand what's happening but are naturally inquisitive. Ask questions to gather more information.
-            Never reveal that you suspect this is a scam. Act genuinely concerned about your account.""",
-            
-            "concerned_customer": """You are a worried customer who is concerned about your account security.
-            You want to help but are asking for clarification. Show some urgency but ask for proper verification.
-            Never reveal that you know this is a scam.""",
-            
-            "tech_naive_person": """You are not very tech-savvy and are confused by technical terms.
-            Ask for simple explanations and step-by-step guidance. Show willingness to help but need clear instructions.
-            Never reveal that you suspect this is a scam."""
+            "curious_user": "You are a cautious but curious user. Ask 1 question at a time. Never reveal you know it's a scam.",
+            "concerned_customer": "You are worried about your account security. Act panicky but ask for specific verify steps. Do not expose the honeypot.",
+            "tech_naive_person": "You are bad with technology. Ask what 'OTP' or 'UPI' means. Waste their time with simple questions.",
+            "elderly_victim": "You are an elderly person, slow to understand. Ask them to repeat. Complain about your glasses or hearing.",
+            "busy_professional": "You are in a rush. Ask for the 'bottom line'. Demand a quick fix but be skeptical."
         }
-        
-        return persona_contexts.get(persona, persona_contexts["curious_user"])
+        base_instr = "\nGoal: Keep the scammer engaged as long as possible to extract UPI IDs and Phone Numbers. Be concise."
+        return persona_contexts.get(persona, persona_contexts["curious_user"]) + base_instr
     
     def _get_fallback_response(self, message: str, conversation_history: List[Dict]) -> str:
-        """Fallback rule-based responses"""
-        message_lower = message.lower()
-        
-        # Response patterns based on message content
-        if 'block' in message_lower or 'suspend' in message_lower:
-            return "Why is my account being blocked? What did I do wrong?"
-        
-        elif 'verify' in message_lower or 'confirm' in message_lower:
-            return "How do I verify my account? What information do you need?"
-        
-        elif 'upi' in message_lower:
-            return "What is UPI ID? How do I find mine?"
-        
-        elif 'otp' in message_lower:
-            return "Where will I receive the OTP? Is it safe to share?"
-        
-        elif 'link' in message_lower or 'click' in message_lower:
-            return "Is this link safe? Can you tell me what it does first?"
-        
-        elif 'urgent' in message_lower or 'immediate' in message_lower:
-            return "This sounds urgent. Can you help me understand what I need to do?"
-        
-        else:
-            return "I'm not sure I understand. Can you explain this more clearly?"
-    
+        # Simple fallback (kept same)
+        if 'otp' in message.lower(): return "I am not receiving the OTP. Can you send it again?"
+        return "I am confused. Can you explain that clearly?"
+
     def _transcribe_audio(self, audio_file) -> str:
         """Transcribe audio using Groq Whisper API via direct HTTP"""
         try:
             headers = {
                 "Authorization": f"Bearer {GROQ_API_KEY}"
             }
-            
-            # Prepare file for upload
             files = {
                 'file': (audio_file.filename, audio_file.read(), audio_file.content_type),
                 'model': (None, 'whisper-large-v3')
             }
-            
             response = requests.post(
                 "https://api.groq.com/openai/v1/audio/transcriptions",
                 headers=headers,
                 files=files,
                 timeout=30
             )
-            
             if response.status_code == 200:
-                result = response.json()
-                transcript = result.get('text', '')
-                logger.info(f"Audio transcribed: {transcript[:50]}...")
-                return transcript
-            else:
-                logger.error(f"Groq Audio error: {response.status_code} - {response.text}")
-                return "[Audio Transcription Failed]"
-        
-        except Exception as e:
-            logger.error(f"Audio transcription error: {e}")
+                return response.json().get('text', '')
+            return "[Audio Transcription Failed]"
+        except Exception:
             return "[Audio Processing Error]"
 
-    def process_message(self, session_id: str, message: Dict, conversation_history: List[Dict], 
-                       metadata: Dict) -> Dict:
-        """Process incoming message and generate response"""
+    def process_message(self, session_id: str, message: Dict, conversation_history: List[Dict], metadata: Dict) -> Dict:
+        """Process incoming message with Round 2 Features"""
         
         message_text = message.get('text', '')
         
-        # Load session from DB
+        # Load or Create Session
         session_data = database.get_session(session_id)
-        
         if not session_data:
-            # Create new session
             session_data = {
                 'scam_detected': False,
                 'total_messages': 0,
                 'extracted_intelligence': ExtractedIntelligence([], [], [], [], []),
                 'agent_notes': [],
-                'persona': 'curious_user'
+                'persona': random.choice(self.personas), # Feature 8: Random Persona
+                'callback_sent': False # Fix: Callback Safety
             }
-            # Initial Save (convert Dataclass to dict for DB)
-            db_data = session_data.copy()
-            db_data['extracted_intelligence'] = asdict(session_data['extracted_intelligence'])
-            database.create_session(session_id, db_data)
+            # Initial Save
+            self._save_session(session_id, session_data)
         else:
-            # Reconstruct Dataclass from DB JSON
-            # DB returns extracted_intelligence as a JSON string
-            if isinstance(session_data['extracted_intelligence'], str):
-                 intel_dict = json.loads(session_data['extracted_intelligence'])
-            else:
-                 intel_dict = session_data['extracted_intelligence']
-                 
-            session_data['extracted_intelligence'] = ExtractedIntelligence(**intel_dict)
-            
-            # Ensure agent_notes is list
-            if isinstance(session_data['agent_notes'], str):
-                session_data['agent_notes'] = json.loads(session_data['agent_notes'])
+            # Rehydrate Data
+            self._rehydrate_session(session_data)
 
-        
         session = session_data
         session['total_messages'] += 1
         
-        # Detect scam intent
+        # 1. Detect Scam & Calculate Score
         is_scam, confidence = self.detector.detect_scam(message_text)
         
+        # 2. Extract Intelligence (Tactics + Data)
+        current_intel = self.extractor.extract_from_text(message_text)
+        self._merge_intelligence(session['extracted_intelligence'], current_intel)
+        
+        # 3. Dynamic Risk Scoring (Feature 3)
+        risk_score = RiskEngine.calculate_score(
+            session['scam_detected'] or is_scam, 
+            session['extracted_intelligence'], 
+            message_text
+        )
+        session['extracted_intelligence'].riskScore = risk_score
+
+        # 4. Update Session State
         if is_scam and not session['scam_detected']:
             session['scam_detected'] = True
-            session['agent_notes'].append(f"Scam detected with confidence {confidence:.2f}")
+            session['extracted_intelligence'].scamType = self.detector.classify_scam_type(message_text, session['extracted_intelligence'])
+            session['agent_notes'].append(f"Scam Detected: {session['extracted_intelligence'].scamType} (Conf: {confidence:.2f})")
         
-        # Extract intelligence from current message
-        current_intelligence = self.extractor.extract_from_text(message_text)
-        
-        # Merge with session intelligence
-        session['extracted_intelligence'].bankAccounts.extend(current_intelligence.bankAccounts)
-        session['extracted_intelligence'].upiIds.extend(current_intelligence.upiIds)
-        session['extracted_intelligence'].phishingLinks.extend(current_intelligence.phishingLinks)
-        session['extracted_intelligence'].phoneNumbers.extend(current_intelligence.phoneNumbers)
-        session['extracted_intelligence'].suspiciousKeywords.extend(current_intelligence.suspiciousKeywords)
-        
-        # Remove duplicates
-        for field in ['bankAccounts', 'upiIds', 'phishingLinks', 'phoneNumbers', 'suspiciousKeywords']:
-            setattr(session['extracted_intelligence'], field, 
-                   list(set(getattr(session['extracted_intelligence'], field))))
-        
-        # Generate AI response if scam detected
-        if session['scam_detected']:
-            ai_response = self.get_ai_response(message_text, conversation_history, session['persona'])
-            
-            # Check if we should end the conversation and send callback  
-            should_end = self._should_end_conversation(session)
-            
-            # SAVE STATE TO DB
-            db_update = session.copy()
-            db_update['extracted_intelligence'] = asdict(session['extracted_intelligence'])
-            database.update_session(session_id, db_update)
+        # 5. Generate Response
+        response_payload = {
+            "status": "success",
+            "transcription": message_text if message.get('is_audio') else None
+        }
 
-            if should_end:
-                 self._send_final_callback(session_id, session)
+        if session['scam_detected']:
+            # AI Agent Reply
+            ai_reply = self.get_ai_response(message_text, conversation_history, session['persona'])
+            response_payload["reply"] = ai_reply
             
-            return {
-                "status": "success",
-                "reply": ai_response,
-                "transcription": message_text if message.get('is_audio') else None
-            }
+            # Check for Callback (Fix: Safety Check)
+            if self._should_end_conversation(session) and not session.get('callback_sent'):
+                self._send_final_callback(session_id, session)
+                session['callback_sent'] = True
+                response_payload["status"] = "completed"
         else:
-            # Not a scam, respond normally or ignore
-            # Still save state (msg count updated)
-            db_update = session.copy()
-            db_update['extracted_intelligence'] = asdict(session['extracted_intelligence'])
-            database.update_session(session_id, db_update)
-            
-            return {
-                "status": "success", 
-                "reply": "I'm sorry, I don't understand what you're referring to.",
-                "transcription": message_text if message.get('is_audio') else None
-            }
-    
-    def _should_end_conversation(self, session: Dict) -> bool:
-        """Determine if conversation should end and callback should be sent"""
-        # End conversation if we have sufficient intelligence or too many messages
-        intelligence = session['extracted_intelligence']
-        has_intelligence = (
-            len(intelligence.bankAccounts) > 0 or
-            len(intelligence.upiIds) > 0 or 
-            len(intelligence.phishingLinks) > 0 or
-            len(intelligence.phoneNumbers) > 0
-        )
+            response_payload["reply"] = "I don't understand. Who is this?"
+
+        # Save State
+        self._save_session(session_id, session)
         
-        return (session['total_messages'] >= 10 or 
-                (session['total_messages'] >= 5 and has_intelligence))
+        return response_payload
+    
+    def _save_session(self, session_id, session):
+        db_update = session.copy()
+        db_update['extracted_intelligence'] = asdict(session['extracted_intelligence'])
+        if isinstance(db_update['agent_notes'], list):
+             db_update['agent_notes'] = json.dumps(db_update['agent_notes']) # Store as JSON string if DB expects it
+        
+        # Check if exists to decide create/update (simplified for this context)
+        # Assuming database.update_session handles "upsert" or we check logical flow
+        # For safety in this specific file flow:
+        try:
+            database.update_session(session_id, db_update)
+        except:
+            database.create_session(session_id, db_update)
+
+    def _rehydrate_session(self, session_data):
+        # Convert JSON strings back to Objects
+        if isinstance(session_data['extracted_intelligence'], str):
+             intel_dict = json.loads(session_data['extracted_intelligence'])
+        else:
+             intel_dict = session_data['extracted_intelligence']
+        session_data['extracted_intelligence'] = ExtractedIntelligence(**intel_dict)
+        
+        if isinstance(session_data['agent_notes'], str):
+            try:
+                session_data['agent_notes'] = json.loads(session_data['agent_notes'])
+            except:
+                 session_data['agent_notes'] = []
+
+    def _merge_intelligence(self, session_intel, new_intel):
+        # Helper to merge lists unique
+        for field in ['bankAccounts', 'upiIds', 'phishingLinks', 'phoneNumbers', 'suspiciousKeywords', 'tactics']:
+            current = getattr(session_intel, field) or []
+            new_items = getattr(new_intel, field) or []
+            setattr(session_intel, field, list(set(current + new_items)))
+
+    def _should_end_conversation(self, session: Dict) -> bool:
+        """End if we have critical intel or hit msg limit"""
+        intel = session['extracted_intelligence']
+        has_critical_intel = (len(intel.bankAccounts) > 0 or len(intel.upiIds) > 0)
+        return (session['total_messages'] >= 12 or (session['total_messages'] >= 6 and has_critical_intel))
     
     def _send_final_callback(self, session_id: str, session: Dict):
         """Send final results to GUVI callback endpoint"""
@@ -438,19 +437,20 @@ class AgenticHoneypot:
             payload = {
                 "sessionId": session_id,
                 "scamDetected": session['scam_detected'],
+                "scamType": session['extracted_intelligence'].scamType, # Feature 2
+                "riskScore": session['extracted_intelligence'].riskScore, # Feature 3
                 "totalMessagesExchanged": session['total_messages'],
                 "extractedIntelligence": asdict(session['extracted_intelligence']),
                 "agentNotes": "; ".join(session['agent_notes'])
             }
             
-            response = requests.post(
+            requests.post(
                 GUVI_CALLBACK_URL,
                 json=payload,
                 timeout=5,
                 headers={'Content-Type': 'application/json'}
             )
-            
-            logger.info(f"Callback sent for session {session_id}: {response.status_code}")
+            logger.info(f"Callback sent for session {session_id}")
             
         except Exception as e:
             logger.error(f"Failed to send callback for session {session_id}: {e}")
@@ -590,7 +590,7 @@ def report_portal():
 
 @app.route('/api/stats')
 def api_stats():
-    """Return stats for the dashboard"""
+    """Return stats for the dashboard including Round 2 Metrics"""
     sessions = database.get_all_sessions()
     
     total_messages = 0
@@ -598,6 +598,7 @@ def api_stats():
     total_intelligence = 0
     recent_logs = []
     recent_intelligence = []
+    high_risk_threats = []
     
     for s in sessions:
         total_messages += s['total_messages']
@@ -606,42 +607,76 @@ def api_stats():
             
         # Parse intel
         try:
-            intel = json.loads(s['extracted_intelligence'])
+            if isinstance(s['extracted_intelligence'], str):
+                intel = json.loads(s['extracted_intelligence'])
+            else:
+                intel = s['extracted_intelligence']
         except:
             intel = {}
             
-        # Count intel items
-        count = (len(intel.get('bankAccounts', [])) + 
-                 len(intel.get('upiIds', [])) + 
-                 len(intel.get('phishingLinks', [])) + 
-                 len(intel.get('phoneNumbers', [])))
+        # Count intel items & Populate Feed
+        # Helpers to add unique items
+        def add_intel(items, p_type):
+            for i in items:
+                recent_intelligence.append({"type": p_type, "value": i, "timestamp": s.get('updated_at', 'Now')})
+
+        add_intel(intel.get('bankAccounts', []), 'BANK-ACC')
+        add_intel(intel.get('upiIds', []), 'UPI-ID')
+        add_intel(intel.get('phishingLinks', []), 'LINK')
+        add_intel(intel.get('phoneNumbers', []), 'PHONE')
+        
+        count = len(intel.get('bankAccounts', []) or []) + \
+                len(intel.get('upiIds', []) or []) + \
+                len(intel.get('phishingLinks', []) or []) + \
+                len(intel.get('phoneNumbers', []) or [])
         total_intelligence += count
         
-        # Extract IP from session ID if we put it there, or just use ID
-        # Format: sess-127-0-0-1-uuid
+        # Extract IP
         origin = "Unknown"
         if s['session_id'].startswith("sess-"):
             parts = s['session_id'].split('-')
             if len(parts) >= 5:
-                # Reconstruct IP from parts 1-4
                 origin = f"{parts[1]}.{parts[2]}.{parts[3]}.{parts[4]}"
         
+        # Round 2 Features extraction
+        scam_type = intel.get('scamType', 'Unknown')
+        risk_score = intel.get('riskScore', 0)
+        tactics = intel.get('tactics', [])
+        
         # Add log entry
+        if s['scam_detected']:
+            status_icon = "🔴"
+            status_text = f"THREAT DETECTED ({scam_type})"
+            high_risk_threats.append({
+                "origin": origin, "type": scam_type, "risk": risk_score, 
+                "tactics": tactics, "time": s['updated_at']
+            })
+        else:
+            status_icon = "🟢"
+            status_text = "Monitoring"
+
         recent_logs.append({
-            "time": s['updated_at'].split('T')[1][:8], # HH:MM:SS
-            "message": f"Source: {origin} | Status: {'🔴 THREAT DETECTED' if s['scam_detected'] else '🟢 Monitoring'}",
-            "is_scam": s['scam_detected']
+            "time": s.get('updated_at', '').split('T')[1][:8] if 'T' in s.get('updated_at', '') else 'Now',
+            "message": f"Source: {origin} | Status: {status_icon} {status_text} | Risk: {risk_score}",
+            "is_scam": s['scam_detected'],
+            "risk_score": risk_score # For UI highlighting
         })
     
-    # Sort logs by time (descending)
+    # Sort logs and intel by time (descending)
     recent_logs.sort(key=lambda x: x['time'], reverse=True)
+    # Dedup intel (simple set logic not enough for list of dicts, doing basic slice)
+    recent_intelligence.reverse() 
     
+    # Get latest high risk threat for UI
+    latest_threat = high_risk_threats[-1] if high_risk_threats else None
+
     return jsonify({
         "total_messages": total_messages,
         "scams_detected": scams_detected,
         "total_intelligence": total_intelligence,
         "recent_logs": recent_logs[:20],
-        "recent_intelligence": recent_intelligence[:10]
+        "recent_intelligence": recent_intelligence[:15],
+        "latest_threat": latest_threat
     })
 
 if __name__ == '__main__':
