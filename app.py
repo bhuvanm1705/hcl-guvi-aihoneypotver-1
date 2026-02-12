@@ -490,11 +490,13 @@ def honeypot_endpoint():
         data = {}
         message = {}
         session_id = None
+        source_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         
         if audio_file:
             # Handle Audio
             transcript = honeypot._transcribe_audio(audio_file)
-            message = {'text': transcript, 'sender': 'user', 'is_audio': True}
+            sender_id = f"Caller-IP:{source_ip}"
+            message = {'text': transcript, 'sender': sender_id, 'is_audio': True}
             
             # Try to get other fields from form data if available
             session_id = request.form.get('sessionId')
@@ -517,7 +519,8 @@ def honeypot_endpoint():
         if not session_id:
             # Generate a temporary session ID if missing (for tester compatibility)
             import uuid
-            session_id = f"temp-{uuid.uuid4()}"
+            safe_ip = source_ip.replace('.', '-').replace(':', '-') if source_ip else 'unknown'
+            session_id = f"sess-{safe_ip}-{str(uuid.uuid4())[:8]}"
             logger.info(f"Generated temp session ID: {session_id}")
             
         # Handle cases where message might be just text or missing (for JSON flow)
@@ -608,19 +611,24 @@ def api_stats():
                  len(intel.get('phoneNumbers', [])))
         total_intelligence += count
         
-        # Add to recent lists (just a few for demo)
-        if len(recent_intelligence) < 10:
-             for upi in intel.get('upiIds', []):
-                 recent_intelligence.append({"type": "UPI", "value": upi})
-             for phone in intel.get('phoneNumbers', []):
-                 recent_intelligence.append({"type": "PHONE", "value": phone})
+        # Extract IP from session ID if we put it there, or just use ID
+        # Format: sess-127-0-0-1-uuid
+        origin = "Unknown"
+        if s['session_id'].startswith("sess-"):
+            parts = s['session_id'].split('-')
+            if len(parts) >= 5:
+                # Reconstruct IP from parts 1-4
+                origin = f"{parts[1]}.{parts[2]}.{parts[3]}.{parts[4]}"
         
         # Add log entry
         recent_logs.append({
             "time": s['updated_at'].split('T')[1][:8], # HH:MM:SS
-            "message": f"Session {s['session_id'][:8]}... {'(SCAM)' if s['scam_detected'] else ''}",
+            "message": f"Source: {origin} | Status: {'🔴 THREAT DETECTED' if s['scam_detected'] else '🟢 Monitoring'}",
             "is_scam": s['scam_detected']
         })
+    
+    # Sort logs by time (descending)
+    recent_logs.sort(key=lambda x: x['time'], reverse=True)
     
     return jsonify({
         "total_messages": total_messages,
