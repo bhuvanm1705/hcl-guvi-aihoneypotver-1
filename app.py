@@ -582,6 +582,12 @@ def dashboard():
     from flask import render_template
     return render_template('dashboard.html')
 
+@app.route('/report')
+def report_portal():
+    """Serve the public reporting portal (for MP3 upload)"""
+    from flask import render_template
+    return render_template('report.html')
+
 @app.route('/api/stats')
 def api_stats():
     """Return stats for the dashboard"""
