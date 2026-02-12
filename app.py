@@ -439,6 +439,7 @@ class AgenticHoneypot:
             len(intel.phishingLinks) + 
             len(intel.phoneNumbers)
         )
+        logger.info(f"Callback Check: Msgs={session['total_messages']}, Intel={intel_count} (Req: >10 or >=2)")
         # Requirement: > 10 messages OR >= 2 intel items
         return (session['total_messages'] > 10 or intel_count >= 2)
     
