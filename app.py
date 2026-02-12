@@ -213,6 +213,7 @@ class IntelligenceExtractor:
 
 import database
 
+class AgenticHoneypot:
     def __init__(self):
         self.detector = ScamDetector()
         self.extractor = IntelligenceExtractor()
