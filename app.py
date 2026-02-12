@@ -441,7 +441,9 @@ class AgenticHoneypot:
         )
         logger.info(f"Callback Check: Msgs={session['total_messages']}, Intel={intel_count} (Req: >10 or >=2)")
         # Requirement: > 10 messages OR >= 2 intel items
-        return (session['total_messages'] > 10 or intel_count >= 2)
+        # AND Scam must be detected (Feature safety)
+        should_callback = session['scam_detected'] and (session['total_messages'] > 10 or intel_count >= 2)
+        return should_callback
     
     def _send_final_callback(self, session_id: str, session: Dict):
         """Send final results to GUVI callback endpoint"""
