@@ -111,7 +111,7 @@
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-            formData.append('x_api_key', 'your-secret-api-key'); // Hardcoded for demo simplicity
+            formData.append('x_api_key', '{{ api_key }}'); // Injected by Flask
 
             try {
                 const response = await fetch('/api/honeypot', {

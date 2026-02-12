@@ -591,7 +591,7 @@ def dashboard():
 def report_portal():
     """Serve the public reporting portal (for MP3 upload)"""
     from flask import render_template
-    return render_template('report.html')
+    return render_template('report.html', api_key=API_KEY)
 
 @app.route('/api/stats')
 def api_stats():
