@@ -142,7 +142,7 @@
                 <div class="w-3 h-3 bg-cyan-400 rounded-full blink"></div>
                 <div>
                     <h1 class="text-2xl font-bold tracking-wider neon-text text-cyan-400">AGENTIC HONEYPOT <span
-                            class="text-xs text-cyan-700 ml-2">v2.2.0</span></h1>
+                            class="text-xs text-cyan-700 ml-2">v2.2.1-FIX</span></h1>
                     <p class="text-xs text-slate-400">REAL-TIME THREAT INTELLIGENCE SYSTEM</p>
                 </div>
             </div>
@@ -283,7 +283,8 @@
             attributionControl: false
         });
 
-        const image = L.imageOverlay('/static/india_map.png', bounds).addTo(map);
+        // Add Cache Buster to Image URL
+        const image = L.imageOverlay('/static/india_map.png?v=2.2.1', bounds).addTo(map);
         map.fitBounds(bounds);
 
         // Define Custom Icons
