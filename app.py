@@ -431,10 +431,16 @@ class AgenticHoneypot:
             setattr(session_intel, field, list(set(current + new_items)))
 
     def _should_end_conversation(self, session: Dict) -> bool:
-        """End if we have critical intel or hit msg limit"""
+        """End if we have critical intel or hit msg limit (Hackathon Rule 3)"""
         intel = session['extracted_intelligence']
-        has_critical_intel = (len(intel.bankAccounts) > 0 or len(intel.upiIds) > 0)
-        return (session['total_messages'] >= 12 or (session['total_messages'] >= 6 and has_critical_intel))
+        intel_count = (
+            len(intel.bankAccounts) + 
+            len(intel.upiIds) + 
+            len(intel.phishingLinks) + 
+            len(intel.phoneNumbers)
+        )
+        # Requirement: > 10 messages OR >= 2 intel items
+        return (session['total_messages'] > 10 or intel_count >= 2)
     
     def _send_final_callback(self, session_id: str, session: Dict):
         """Send final results to GUVI callback endpoint"""
