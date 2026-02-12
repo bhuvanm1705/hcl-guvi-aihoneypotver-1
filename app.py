@@ -682,11 +682,6 @@ def api_stats():
         "latest_threat": latest_threat
     })
 
-@app.route('/health')
-def health_check():
-    """Health check endpoint for Railway"""
-    return jsonify({"status": "healthy", "time": datetime.now().isoformat()}), 200
-
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
