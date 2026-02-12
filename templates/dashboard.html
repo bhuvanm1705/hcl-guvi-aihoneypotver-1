@@ -1,120 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Honeypot Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #020617;
+        }
+
         .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.05);
+        }
+
+        .neon-text {
+            text-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+        }
+
+        .grid-bg {
+            background-image: linear-gradient(rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .blink {
+            animation: blinker 1.5s linear infinite;
+        }
+
+        @keyframes blinker {
+            50% {
+                opacity: 0;
+            }
         }
     </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen">
-    <div class="container mx-auto p-6">
-        <header class="flex justify-between items-center mb-10">
-            <div>
-                <h1 class="text-3xl font-bold text-blue-400">🛡️ Agentic Honeypot</h1>
-                <p class="text-slate-400">Live Scam Detection & Intelligence Center</p>
-            </div>
-            <div class="flex gap-4">
-                <div class="text-right">
-                    <p class="text-sm text-slate-400">Status</p>
-                    <p class="text-green-400 font-mono">● SYSTEM ACTIVE</p>
+
+<body class="text-cyan-50 min-h-screen grid-bg overflow-hidden">
+    <div class="h-screen flex flex-col p-4">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-6 px-2">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 bg-cyan-400 rounded-full blink"></div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-wider neon-text text-cyan-400">AGENTIC HONEYPOT <span
+                            class="text-xs text-cyan-700 ml-2">v2.0.1</span></h1>
+                    <p class="text-xs text-slate-400">REAL-TIME THREAT INTELLIGENCE SYSTEM</p>
                 </div>
+            </div>
+            <div class="glass px-4 py-2 rounded flex gap-6 text-xs bg-slate-900/50">
+                <div>SERVER: <span class="text-green-400">ONLINE</span></div>
+                <div>DATABASE: <span class="text-green-400">CONNECTED</span></div>
+                <div>AI AGENTS: <span class="text-green-400">ACTIVE</span></div>
             </div>
         </header>
 
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            <div class="glass p-6 rounded-xl">
-                <h3 class="text-slate-400 text-sm uppercase">Total Attacks</h3>
-                <p class="text-4xl font-bold mt-2" id="total-attacks">0</p>
+        <!-- KPI Grid -->
+        <div class="grid grid-cols-4 gap-4 mb-6">
+            <div class="glass p-4 rounded-lg border-l-4 border-cyan-500">
+                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Total Hits</h3>
+                <p class="text-3xl font-bold text-white mb-0" id="total-attacks">0</p>
+                <div class="text-[10px] text-cyan-500 mt-1">▲ LIVE TRAFFIC</div>
             </div>
-            <div class="glass p-6 rounded-xl">
-                <h3 class="text-slate-400 text-sm uppercase">Scams Blocked</h3>
-                <p class="text-4xl font-bold mt-2 text-red-400" id="scams-detected">0</p>
+            <div class="glass p-4 rounded-lg border-l-4 border-red-500">
+                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Threats Blocked</h3>
+                <p class="text-3xl font-bold text-red-400 mb-0" id="scams-detected">0</p>
+                <div class="text-[10px] text-red-500 mt-1">HIGH SEVERITY</div>
             </div>
-            <div class="glass p-6 rounded-xl">
-                <h3 class="text-slate-400 text-sm uppercase">Intelligence Gathered</h3>
-                <p class="text-4xl font-bold mt-2 text-yellow-400" id="intel-count">0</p>
-                <p class="text-xs text-slate-500 mt-1">UPIs, Bank Acc, Links</p>
+            <div class="glass p-4 rounded-lg border-l-4 border-yellow-500">
+                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Intel Items</h3>
+                <p class="text-3xl font-bold text-yellow-400 mb-0" id="intel-count">0</p>
+                <div class="text-[10px] text-yellow-500 mt-1">DATAPOINTS EXTRACTED</div>
             </div>
-            <div class="glass p-6 rounded-xl">
-                <h3 class="text-slate-400 text-sm uppercase">Est. Saved Value</h3>
-                <p class="text-4xl font-bold mt-2 text-green-400">₹<span id="money-saved">0</span></p>
+            <div class="glass p-4 rounded-lg border-l-4 border-emerald-500">
+                <h3 class="text-slate-400 text-xs uppercase tracking-widest mb-1">Est. Value Saved</h3>
+                <p class="text-3xl font-bold text-emerald-400 mb-0">₹<span id="money-saved">0</span></p>
+                <div class="text-[10px] text-emerald-500 mt-1">BASED ON AVG LOSS</div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Activity Chart -->
-            <div class="glass p-6 rounded-xl lg:col-span-2">
-                <h3 class="text-xl font-semibold mb-4">Live Activity Feed</h3>
-                <div class="h-64 overflow-y-auto font-mono text-sm space-y-2" id="activity-log">
-                    <!-- Logs will appear here -->
-                    <div class="text-slate-500 italic">Waiting for incoming traffic...</div>
+        <!-- Main Dashboard Area -->
+        <div class="grid grid-cols-12 gap-4 flex-1 min-h-0">
+
+            <!-- Left Column: Traffic Graph & Map -->
+            <div class="col-span-8 flex flex-col gap-4 min-h-0">
+                <!-- Traffic Graph -->
+                <div class="glass p-4 rounded-lg flex-1 min-h-0 relative flex flex-col">
+                    <h3 class="text-cyan-400 text-xs font-bold mb-2 flex justify-between">
+                        <span>NETWORK TRAFFIC ANALYSIS</span>
+                        <span class="text-[10px] text-slate-500">REQ/SEC</span>
+                    </h3>
+                    <div class="relative flex-1 min-h-0 w-full">
+                        <canvas id="trafficChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- World Map (Visual Placeholder) -->
+                <div class="glass p-4 rounded-lg h-60 relative overflow-hidden">
+                    <h3 class="text-cyan-400 text-xs font-bold mb-2 absolute top-4 left-4 z-10">GLOBAL THREAT ORIGIN
+                    </h3>
+                    <div
+                        class="absolute inset-0 opacity-30 bg-[url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg')] bg-cover bg-center invert hue-rotate-180">
+                    </div>
+                    <!-- Animated Dots (Fake Locations for Demo) -->
+                    <div class="absolute top-1/2 left-1/2 w-2 h-2 bg-red-500 rounded-full blink"
+                        style="top: 40%; left: 70%"></div> <!-- Asia -->
+                    <div class="absolute top-1/2 left-1/2 w-2 h-2 bg-red-500 rounded-full blink"
+                        style="top: 30%; left: 20%"></div> <!-- US -->
+                    <div class="absolute top-1/2 left-1/2 w-2 h-2 bg-red-500 rounded-full blink"
+                        style="top: 60%; left: 55%"></div> <!-- Africa -->
                 </div>
             </div>
 
-            <!-- Intelligence List -->
-            <div class="glass p-6 rounded-xl">
-                <h3 class="text-xl font-semibold mb-4 text-yellow-400">Captured Intelligence</h3>
-                <div class="h-64 overflow-y-auto space-y-3" id="intel-list">
-                    <!-- Intel items -->
+            <!-- Right Column: Logs & Intel -->
+            <div class="col-span-4 flex flex-col gap-4 min-h-0">
+                <!-- Terminal Feed -->
+                <div class="glass p-0 rounded-lg flex flex-col flex-1 overflow-hidden">
+                    <div class="bg-slate-900/80 p-2 border-b border-slate-700 flex justify-between items-center">
+                        <span class="text-xs text-slate-400">SYSTEM LOGS</span>
+                        <div class="flex gap-1">
+                            <div class="w-2 h-2 rounded-full bg-slate-600"></div>
+                            <div class="w-2 h-2 rounded-full bg-slate-600"></div>
+                        </div>
+                    </div>
+                    <div class="p-3 overflow-y-auto font-mono text-[11px] space-y-1 flex-1 h-full" id="activity-log">
+                        <div class="text-slate-500">Initializing system daemon...</div>
+                        <div class="text-slate-500">Listening on port 8080...</div>
+                    </div>
+                </div>
+
+                <!-- Live Intel -->
+                <div class="glass p-4 rounded-lg h-1/3 flex flex-col">
+                    <h3 class="text-yellow-400 text-xs font-bold mb-3">CAPTURED DATA</h3>
+                    <div class="overflow-y-auto space-y-2 flex-1 scrollbar-hide" id="intel-list">
+                        <!-- Items -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // --- 1. Traffic Chart Setup ---
+        const ctx = document.getElementById('trafficChart').getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(6, 182, 212, 0.5)'); // Cyan
+        gradient.addColorStop(1, 'rgba(6, 182, 212, 0)');
+
+        const trafficChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(20).fill(''),
+                datasets: [{
+                    label: 'Requests',
+                    data: Array(20).fill(0),
+                    borderColor: '#22d3ee',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: { display: true, grid: { color: 'rgba(51, 65, 85, 0.3)' }, beginAtZero: true }
+                },
+                animation: { duration: 0 }
+            }
+        });
+
+        // --- 2. Live Data Update ---
         function updateStats() {
             fetch('/api/stats')
                 .then(response => response.json())
                 .then(data => {
+                    // Update KPI numbers with animation effect
                     document.getElementById('total-attacks').innerText = data.total_messages;
                     document.getElementById('scams-detected').innerText = data.scams_detected;
-                    
-                    // Count intelligence items
-                    let intelCount = 0;
-                    const intelList = document.getElementById('intel-list');
-                    intelList.innerHTML = ''; // Clear current list
-                    
-                    // Simple logic to aggregate intel from all sessions
-                    // In a real app we would paginate, but for hackathon show top 10
-                    data.recent_intelligence.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'bg-slate-800 p-2 rounded border border-slate-700 text-xs';
-                        div.innerHTML = `
-                            <span class="text-yellow-500 font-bold">[${item.type}]</span> 
-                            <span class="text-white">${item.value}</span>
-                        `;
-                        intelList.prepend(div);
-                        intelCount++;
-                    });
-                    
                     document.getElementById('intel-count').innerText = data.total_intelligence;
-                    document.getElementById('money-saved').innerText = (data.scams_detected * 5000).toLocaleString(); // Fake metric: 5k per scam
+                    document.getElementById('money-saved').innerText = (data.scams_detected * 5000).toLocaleString();
 
-                    // Update logs
+                    // Update Logs
                     const logContainer = document.getElementById('activity-log');
                     logContainer.innerHTML = '';
                     data.recent_logs.forEach(log => {
                         const div = document.createElement('div');
-                        div.className = `p-2 rounded ${log.is_scam ? 'bg-red-900/30 text-red-200' : 'bg-slate-800/30 text-slate-300'}`;
-                        div.innerText = `[${log.time}] ${log.message}`;
+                        const isScam = log.is_scam;
+                        const colorClass = isScam ? 'text-red-400' : 'text-slate-300';
+                        const prefix = isScam ? '[ALERT]' : '[INFO]';
+
+                        div.className = `${colorClass} border-b border-slate-800/50 pb-1 mb-1`;
+                        div.innerHTML = `<span class="opacity-50">${log.time}</span> <span class="font-bold">${prefix}</span> ${log.message}`;
                         logContainer.prepend(div);
                     });
+
+                    // Update Intel
+                    const intelList = document.getElementById('intel-list');
+                    intelList.innerHTML = '';
+                    data.recent_intelligence.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'bg-slate-900/80 p-2 rounded border-l-2 ' + (item.type === 'UPI' ? 'border-purple-500' : 'border-yellow-500');
+                        div.innerHTML = `
+                            <div class="flex justify-between text-[10px] text-slate-400">
+                                <span>TYPE: ${item.type}</span>
+                                <span>CONF: 100%</span>
+                            </div>
+                            <div class="text-xs font-mono text-white mt-1 select-all">${item.value}</div>
+                        `;
+                        intelList.prepend(div);
+                    });
+
+                    // Mock Graph Update (Add slight randomness to look "alive")
+                    const currentData = trafficChart.data.datasets[0].data;
+                    currentData.shift();
+                    // Base value on total messages + random jitter
+                    const newValue = (data.total_messages % 10) + Math.random() * 5;
+                    currentData.push(newValue);
+                    trafficChart.update();
                 })
                 .catch(err => console.error(err));
         }
 
-        // Poll every 2 seconds
         setInterval(updateStats, 2000);
         updateStats();
     </script>
 </body>
+
 </html>
