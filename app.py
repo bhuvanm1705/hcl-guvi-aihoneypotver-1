@@ -508,11 +508,69 @@ def root():
     """Root endpoint"""
     return jsonify({
         "service": "Agentic Honeypot for Scam Detection",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "endpoints": {
             "honeypot": "/api/honeypot",
+            "dashboard": "/dashboard",
             "health": "/health"
         }
+    })
+
+@app.route('/dashboard')
+def dashboard():
+    """Serve the dashboard UI"""
+    from flask import render_template
+    return render_template('dashboard.html')
+
+@app.route('/api/stats')
+def api_stats():
+    """Return stats for the dashboard"""
+    sessions = database.get_all_sessions()
+    
+    total_messages = 0
+    scams_detected = 0
+    total_intelligence = 0
+    recent_logs = []
+    recent_intelligence = []
+    
+    for s in sessions:
+        total_messages += s['total_messages']
+        if s['scam_detected']:
+            scams_detected += 1
+            
+        # Parse intel
+        try:
+            intel = json.loads(s['extracted_intelligence'])
+        except:
+            intel = {}
+            
+        # Count intel items
+        count = (len(intel.get('bankAccounts', [])) + 
+                 len(intel.get('upiIds', [])) + 
+                 len(intel.get('phishingLinks', [])) + 
+                 len(intel.get('phoneNumbers', [])))
+        total_intelligence += count
+        
+        # Add to recent lists (just a few for demo)
+        if len(recent_intelligence) < 10:
+             for upi in intel.get('upiIds', []):
+                 recent_intelligence.append({"type": "UPI", "value": upi})
+             for phone in intel.get('phoneNumbers', []):
+                 recent_intelligence.append({"type": "PHONE", "value": phone})
+        
+        # Add log entry
+        recent_logs.append({
+            "time": s['updated_at'].split('T')[1][:8], # HH:MM:SS
+            "message": f"Session {s['session_id'][:8]}... {'(SCAM)' if s['scam_detected'] else ''}",
+            "is_scam": s['scam_detected']
+        })
+    
+    return jsonify({
+        "total_messages": total_messages,
+        "scams_detected": scams_detected,
+        "total_intelligence": total_intelligence,
+        "recent_logs": recent_logs[:20],
+        "recent_intelligence": recent_intelligence[:10]
     })
 
 if __name__ == '__main__':

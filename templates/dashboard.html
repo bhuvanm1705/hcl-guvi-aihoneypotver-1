@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honeypot Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-10">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400">🛡️ Agentic Honeypot</h1>
+                <p class="text-slate-400">Live Scam Detection & Intelligence Center</p>
+            </div>
+            <div class="flex gap-4">
+                <div class="text-right">
+                    <p class="text-sm text-slate-400">Status</p>
+                    <p class="text-green-400 font-mono">● SYSTEM ACTIVE</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            <div class="glass p-6 rounded-xl">
+                <h3 class="text-slate-400 text-sm uppercase">Total Attacks</h3>
+                <p class="text-4xl font-bold mt-2" id="total-attacks">0</p>
+            </div>
+            <div class="glass p-6 rounded-xl">
+                <h3 class="text-slate-400 text-sm uppercase">Scams Blocked</h3>
+                <p class="text-4xl font-bold mt-2 text-red-400" id="scams-detected">0</p>
+            </div>
+            <div class="glass p-6 rounded-xl">
+                <h3 class="text-slate-400 text-sm uppercase">Intelligence Gathered</h3>
+                <p class="text-4xl font-bold mt-2 text-yellow-400" id="intel-count">0</p>
+                <p class="text-xs text-slate-500 mt-1">UPIs, Bank Acc, Links</p>
+            </div>
+            <div class="glass p-6 rounded-xl">
+                <h3 class="text-slate-400 text-sm uppercase">Est. Saved Value</h3>
+                <p class="text-4xl font-bold mt-2 text-green-400">₹<span id="money-saved">0</span></p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Activity Chart -->
+            <div class="glass p-6 rounded-xl lg:col-span-2">
+                <h3 class="text-xl font-semibold mb-4">Live Activity Feed</h3>
+                <div class="h-64 overflow-y-auto font-mono text-sm space-y-2" id="activity-log">
+                    <!-- Logs will appear here -->
+                    <div class="text-slate-500 italic">Waiting for incoming traffic...</div>
+                </div>
+            </div>
+
+            <!-- Intelligence List -->
+            <div class="glass p-6 rounded-xl">
+                <h3 class="text-xl font-semibold mb-4 text-yellow-400">Captured Intelligence</h3>
+                <div class="h-64 overflow-y-auto space-y-3" id="intel-list">
+                    <!-- Intel items -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-attacks').innerText = data.total_messages;
+                    document.getElementById('scams-detected').innerText = data.scams_detected;
+                    
+                    // Count intelligence items
+                    let intelCount = 0;
+                    const intelList = document.getElementById('intel-list');
+                    intelList.innerHTML = ''; // Clear current list
+                    
+                    // Simple logic to aggregate intel from all sessions
+                    // In a real app we would paginate, but for hackathon show top 10
+                    data.recent_intelligence.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'bg-slate-800 p-2 rounded border border-slate-700 text-xs';
+                        div.innerHTML = `
+                            <span class="text-yellow-500 font-bold">[${item.type}]</span> 
+                            <span class="text-white">${item.value}</span>
+                        `;
+                        intelList.prepend(div);
+                        intelCount++;
+                    });
+                    
+                    document.getElementById('intel-count').innerText = data.total_intelligence;
+                    document.getElementById('money-saved').innerText = (data.scams_detected * 5000).toLocaleString(); // Fake metric: 5k per scam
+
+                    // Update logs
+                    const logContainer = document.getElementById('activity-log');
+                    logContainer.innerHTML = '';
+                    data.recent_logs.forEach(log => {
+                        const div = document.createElement('div');
+                        div.className = `p-2 rounded ${log.is_scam ? 'bg-red-900/30 text-red-200' : 'bg-slate-800/30 text-slate-300'}`;
+                        div.innerText = `[${log.time}] ${log.message}`;
+                        logContainer.prepend(div);
+                    });
+                })
+                .catch(err => console.error(err));
+        }
+
+        // Poll every 2 seconds
+        setInterval(updateStats, 2000);
+        updateStats();
+    </script>
+</body>
+</html>
