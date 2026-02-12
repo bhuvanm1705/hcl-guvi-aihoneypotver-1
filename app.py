@@ -180,11 +180,14 @@ class IntelligenceExtractor:
         
         return intelligence
 
+import database
+
 class AgenticHoneypot:
     def __init__(self):
         self.detector = ScamDetector()
         self.extractor = IntelligenceExtractor()
-        self.sessions = {}  # Store session data
+        # Initialize Database
+        database.init_db()
         
         # AI Agent personas and strategies
         self.personas = [
@@ -293,17 +296,38 @@ class AgenticHoneypot:
         
         message_text = message.get('text', '')
         
-        # Initialize session if not exists
-        if session_id not in self.sessions:
-            self.sessions[session_id] = {
+        # Load session from DB
+        session_data = database.get_session(session_id)
+        
+        if not session_data:
+            # Create new session
+            session_data = {
                 'scam_detected': False,
                 'total_messages': 0,
                 'extracted_intelligence': ExtractedIntelligence([], [], [], [], []),
                 'agent_notes': [],
                 'persona': 'curious_user'
             }
+            # Initial Save (convert Dataclass to dict for DB)
+            db_data = session_data.copy()
+            db_data['extracted_intelligence'] = asdict(session_data['extracted_intelligence'])
+            database.create_session(session_id, db_data)
+        else:
+            # Reconstruct Dataclass from DB JSON
+            # DB returns extracted_intelligence as a JSON string
+            if isinstance(session_data['extracted_intelligence'], str):
+                 intel_dict = json.loads(session_data['extracted_intelligence'])
+            else:
+                 intel_dict = session_data['extracted_intelligence']
+                 
+            session_data['extracted_intelligence'] = ExtractedIntelligence(**intel_dict)
+            
+            # Ensure agent_notes is list
+            if isinstance(session_data['agent_notes'], str):
+                session_data['agent_notes'] = json.loads(session_data['agent_notes'])
+
         
-        session = self.sessions[session_id]
+        session = session_data
         session['total_messages'] += 1
         
         # Detect scam intent
@@ -332,9 +356,16 @@ class AgenticHoneypot:
         if session['scam_detected']:
             ai_response = self.get_ai_response(message_text, conversation_history, session['persona'])
             
-            # Check if we should end the conversation and send callback
-            if self._should_end_conversation(session):
-                self._send_final_callback(session_id, session)
+            # Check if we should end the conversation and send callback  
+            should_end = self._should_end_conversation(session)
+            
+            # SAVE STATE TO DB
+            db_update = session.copy()
+            db_update['extracted_intelligence'] = asdict(session['extracted_intelligence'])
+            database.update_session(session_id, db_update)
+
+            if should_end:
+                 self._send_final_callback(session_id, session)
             
             return {
                 "status": "success",
@@ -342,6 +373,11 @@ class AgenticHoneypot:
             }
         else:
             # Not a scam, respond normally or ignore
+            # Still save state (msg count updated)
+            db_update = session.copy()
+            db_update['extracted_intelligence'] = asdict(session['extracted_intelligence'])
+            database.update_session(session_id, db_update)
+            
             return {
                 "status": "success", 
                 "reply": "I'm sorry, I don't understand what you're referring to."
