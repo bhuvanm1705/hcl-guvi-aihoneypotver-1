@@ -403,9 +403,10 @@ class AgenticHoneypot:
         # Check if exists to decide create/update (simplified for this context)
         # Assuming database.update_session handles "upsert" or we check logical flow
         # For safety in this specific file flow:
-        try:
+        existing_session = database.get_session(session_id)
+        if existing_session:
             database.update_session(session_id, db_update)
-        except:
+        else:
             database.create_session(session_id, db_update)
 
     def _rehydrate_session(self, session_data):
