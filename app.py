@@ -385,8 +385,22 @@ class AgenticHoneypot:
             if self._should_end_conversation(session) and not session.get('callback_sent'):
                 self._send_final_callback(session_id, session)
                 session['callback_sent'] = True
+                self._send_final_callback(session_id, session)
+                session['callback_sent'] = True
                 response_payload["status"] = "completed"
+        
         else:
+            response_payload["reply"] = "I don't understand. Who is this?"
+        
+        # DEBUG: Expose counts to client to verify logic
+        response_payload["debug_intel_count"] = (
+            len(session['extracted_intelligence'].bankAccounts) + 
+            len(session['extracted_intelligence'].upiIds) + 
+            len(session['extracted_intelligence'].phishingLinks) + 
+            len(session['extracted_intelligence'].phoneNumbers)
+        )
+        response_payload["debug_msg_count"] = session['total_messages']
+        response_payload["debug_regex_version"] = "v2_indian_mobile"
             response_payload["reply"] = "I don't understand. Who is this?"
 
         # Save State
