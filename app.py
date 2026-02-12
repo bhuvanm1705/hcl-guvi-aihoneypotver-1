@@ -166,7 +166,7 @@ class IntelligenceExtractor:
             'bankAccounts': [r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b', r'\b\d{10,18}\b'],
             'upiIds': [r'\b[\w\.-]+@[\w\.-]+\b'],
             'phishingLinks': [r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'],
-            'phoneNumbers': [r'\+91[-\s]?\d{10}', r'\b\d{10}\b']
+            'phoneNumbers': [r'\+91[-\s]?[6-9]\d{9}', r'\b[6-9]\d{9}\b']
         }
         
         self.tactic_keywords = {
