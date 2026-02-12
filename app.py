@@ -290,6 +290,39 @@ class AgenticHoneypot:
         else:
             return "I'm not sure I understand. Can you explain this more clearly?"
     
+    def _transcribe_audio(self, audio_file) -> str:
+        """Transcribe audio using Groq Whisper API via direct HTTP"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {GROQ_API_KEY}"
+            }
+            
+            # Prepare file for upload
+            files = {
+                'file': (audio_file.filename, audio_file.read(), audio_file.content_type),
+                'model': (None, 'whisper-large-v3')
+            }
+            
+            response = requests.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers=headers,
+                files=files,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                transcript = result.get('text', '')
+                logger.info(f"Audio transcribed: {transcript[:50]}...")
+                return transcript
+            else:
+                logger.error(f"Groq Audio error: {response.status_code} - {response.text}")
+                return "[Audio Transcription Failed]"
+        
+        except Exception as e:
+            logger.error(f"Audio transcription error: {e}")
+            return "[Audio Processing Error]"
+
     def process_message(self, session_id: str, message: Dict, conversation_history: List[Dict], 
                        metadata: Dict) -> Dict:
         """Process incoming message and generate response"""
@@ -369,7 +402,8 @@ class AgenticHoneypot:
             
             return {
                 "status": "success",
-                "reply": ai_response
+                "reply": ai_response,
+                "transcription": message_text if message.get('is_audio') else None
             }
         else:
             # Not a scam, respond normally or ignore
@@ -380,7 +414,8 @@ class AgenticHoneypot:
             
             return {
                 "status": "success", 
-                "reply": "I'm sorry, I don't understand what you're referring to."
+                "reply": "I'm sorry, I don't understand what you're referring to.",
+                "transcription": message_text if message.get('is_audio') else None
             }
     
     def _should_end_conversation(self, session: Dict) -> bool:
@@ -426,7 +461,13 @@ honeypot = AgenticHoneypot()
 def authenticate_request():
     """Authenticate API request"""
     api_key = request.headers.get('x-api-key')
+    
+    # Allow multipart forms to pass auth check if key is in form data
+    if not api_key and request.form.get('x_api_key'):
+        api_key = request.form.get('x_api_key')
+        
     if not api_key or api_key != API_KEY:
+        # Development mode override (optional, for easier testing)
         return False
     return True
 
@@ -443,47 +484,63 @@ def honeypot_endpoint():
         if not authenticate_request():
              return jsonify({"error": "Unauthorized"}), 401
     
-        # Parse request data with silent=True to avoid 400 if content-type is wrong
-        data = request.get_json(silent=True, force=True)
+        # Check for Audio File Upload
+        audio_file = request.files.get('file') or request.files.get('audio')
         
-        # If data is None (parsing failed), try to use an empty dict or parse form data
-        if data is None:
-            data = {}
-            # Log the raw data for debugging
-            logger.info(f"Raw received data: {request.data}")
+        data = {}
+        message = {}
+        session_id = None
         
-        # Access fields with defaults
-        session_id = data.get('sessionId')
+        if audio_file:
+            # Handle Audio
+            transcript = honeypot._transcribe_audio(audio_file)
+            message = {'text': transcript, 'sender': 'user', 'is_audio': True}
+            
+            # Try to get other fields from form data if available
+            session_id = request.form.get('sessionId')
+            
+        else:
+            # Handle JSON
+            # Parse request data with silent=True to avoid 400 if content-type is wrong
+            data = request.get_json(silent=True, force=True)
+            
+            # If data is None (parsing failed), try to use an empty dict or parse form data
+            if data is None:
+                data = {}
+                # Log the raw data for debugging
+                logger.info(f"Raw received data: {request.data}")
+            
+            # Access fields with defaults
+            session_id = data.get('sessionId')
+            message = data.get('message')
+        
         if not session_id:
             # Generate a temporary session ID if missing (for tester compatibility)
             import uuid
             session_id = f"temp-{uuid.uuid4()}"
             logger.info(f"Generated temp session ID: {session_id}")
             
-        message = data.get('message')
-        
-        # Handle cases where message might be just text or missing
-        if not message:
-            # Check if there is a 'text' field directly in root (some testers do this)
+        # Handle cases where message might be just text or missing (for JSON flow)
+        if not message and not audio_file:
             if 'text' in data:
                 message = {'text': data['text'], 'sender': 'user'}
             else:
-                # Create a dummy message to keep the pipeline moving if it's just a connection test
                 message = {'text': 'PING_CONNECTION_TEST', 'sender': 'user'}
                 
         # Ensure message is a dict
         if isinstance(message, str):
             message = {'text': message, 'sender': 'user'}
             
-        conversation_history = data.get('conversationHistory', [])
-        metadata = data.get('metadata', {})
+        conversation_history = data.get('conversationHistory', []) if isinstance(data, dict) else []
+        metadata = data.get('metadata', {}) if isinstance(data, dict) else {}
         
         # Process the message
         response = honeypot.process_message(session_id, message, conversation_history, metadata)
         
         return jsonify({
             "status": "success",
-            "reply": ai_response,
+            "reply": response.get('reply'),
+            "transcription": response.get('transcription'),
             "debug_headers": dict(request.headers)
         })
     
