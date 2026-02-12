@@ -64,7 +64,7 @@
             }
         }
 
-        /* Red Flash Animation for Map Border */
+        /* Flash Animation */
         @keyframes flash-red {
 
             0%,
@@ -83,17 +83,12 @@
             animation: flash-red 1s ease-in-out infinite;
         }
 
-        /* Interactive Map Styling */
+        /* Map Container */
         #interactive-map {
             width: 100%;
             height: 100%;
             background: #0f172a;
-            /* Dark background behind image */
-        }
-
-        /* Cyberpunk Filter for the Map Image Layer */
-        .leaflet-image-layer {
-            filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2);
+            z-index: 1;
         }
 
         /* Custom Leaflet Controls */
@@ -107,6 +102,19 @@
             border: none !important;
         }
 
+        .leaflet-popup-content-wrapper {
+            background: rgba(15, 23, 42, 0.95);
+            color: #ecfeff;
+            border: 1px solid #06b6d4;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+        }
+
+        .leaflet-popup-tip {
+            background: #06b6d4;
+        }
+
         /* Custom Markers */
         .custom-div-icon {
             background: transparent;
@@ -118,18 +126,54 @@
             height: 20px;
             border-radius: 50%;
             position: relative;
-            box-shadow: 0 0 15px currentColor;
+            box-shadow: 0 0 10px currentColor;
         }
 
         .pin-cyan {
             background: #06b6d4;
             color: #06b6d4;
+            border: 2px solid white;
         }
 
+        /* Threat Pulse */
         .pin-red {
             background: #ef4444;
             color: #ef4444;
-            animation: blinker 0.5s infinite;
+        }
+
+        .pin-red::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 1px solid #ef4444;
+            animation: pulse-ring 2s infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                width: 100%;
+                height: 100%;
+                opacity: 1;
+            }
+
+            100% {
+                width: 300%;
+                height: 300%;
+                opacity: 0;
+            }
+        }
+
+        /* User Location Pulse */
+        .pin-blue {
+            background: #3b82f6;
+            color: #3b82f6;
+            border: 2px solid white;
+            box-shadow: 0 0 20px #3b82f6;
         }
     </style>
 </head>
@@ -142,14 +186,15 @@
                 <div class="w-3 h-3 bg-cyan-400 rounded-full blink"></div>
                 <div>
                     <h1 class="text-2xl font-bold tracking-wider neon-text text-cyan-400">AGENTIC HONEYPOT <span
-                            class="text-xs text-cyan-700 ml-2">v2.2.1-FIX</span></h1>
-                    <p class="text-xs text-slate-400">REAL-TIME THREAT INTELLIGENCE SYSTEM</p>
+                            class="text-xs text-cyan-700 ml-2">v3.0.0-REAL-MAP</span></h1>
+                    <p class="text-xs text-slate-400">DEPLOYMENT ID: <span id="deploy-time"
+                            class="text-yellow-500 font-bold">LOADING...</span></p>
                 </div>
             </div>
             <div class="glass px-4 py-2 rounded flex gap-6 text-xs bg-slate-900/50">
                 <div>SERVER: <span class="text-green-400">ONLINE</span></div>
-                <div>DATABASE: <span class="text-green-400">CONNECTED</span></div>
-                <div>AI AGENTS: <span class="text-green-400">ACTIVE</span></div>
+                <div>GPS: <span class="text-blue-400" id="gps-status">LOCATING...</span></div>
+                <div>AGENTS: <span class="text-green-400">ACTIVE</span></div>
             </div>
         </header>
 
@@ -198,12 +243,12 @@
                     id="map-panel">
                     <h3
                         class="text-cyan-400 text-xs font-bold mb-2 z-10 flex justify-between absolute top-4 left-4 right-4 pointer-events-none">
-                        <span>THREAT GEO-LOCATION <span class="text-slate-500 ml-2">(INTERACTIVE)</span></span>
+                        <span>THREAT GEO-LOCATION <span class="text-slate-500 ml-2">(GPS ENABLED)</span></span>
                         <span id="sync-status" class="text-[10px] text-slate-600">CONNECTED</span>
                     </h3>
 
                     <!-- Leaflet Container -->
-                    <div id="interactive-map" class="w-full h-full rounded bg-slate-900 border border-slate-700"></div>
+                    <div id="interactive-map"></div>
                 </div>
             </div>
 
@@ -236,6 +281,10 @@
     </div>
 
     <script>
+        // Set Deployment Timestamp (Debug for user)
+        const now = new Date();
+        document.getElementById('deploy-time').innerText = now.toLocaleTimeString();
+
         // --- 1. Traffic Chart Setup ---
         const ctx = document.getElementById('trafficChart').getContext('2d');
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -269,25 +318,27 @@
             }
         });
 
-        // --- 2. Leaflet ImageOverlay Setup ---
-        // Image Dimensions (Approx)
-        const imgHeight = 1000;
-        const imgWidth = 880;
-        const bounds = [[0, 0], [imgHeight, imgWidth]];
-
+        // --- 2. Leaflet Map Setup (REAL MAP) ---
+        // Center on India
         const map = L.map('interactive-map', {
-            crs: L.CRS.Simple,
-            minZoom: -1,
-            maxZoom: 2,
             zoomControl: true,
             attributionControl: false
-        });
+        }).setView([20.5937, 78.9629], 5); // India Center
 
-        // Add Cache Buster to Image URL
-        const image = L.imageOverlay('/static/india_map.png?v=2.2.1', bounds).addTo(map);
-        map.fitBounds(bounds);
+        // Dark Matter Tiles (Cyberpunk Style)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            subdomains: 'abcd'
+        }).addTo(map);
 
-        // Define Custom Icons
+        // Restrict bounds to India + surroundings
+        const southWest = L.latLng(5.0, 68.0);
+        const northEast = L.latLng(38.0, 98.0);
+        const bounds = L.latLngBounds(southWest, northEast);
+        map.setMaxBounds(bounds);
+        map.setMinZoom(4);
+
+        // Custom Icons
         const honeypotIcon = L.divIcon({
             className: 'custom-div-icon',
             html: "<div class='marker-pin pin-cyan'></div>",
@@ -302,30 +353,56 @@
             iconAnchor: [10, 10]
         });
 
-        // Add Honeypot (Bangalore approx: South-Central)
-        // Y = 1000 - Top% (75%) = 250
-        // X = Left% (45%) of 880 = 396
-        L.marker([250, 396], { icon: honeypotIcon }).addTo(map);
+        const userIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: "<div class='marker-pin pin-blue'></div>",
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        // --- 3. Locate User (Honeypot Location) ---
+        map.locate({ setView: true, maxZoom: 6 });
+
+        function onLocationFound(e) {
+            L.marker(e.latlng, { icon: userIcon }).addTo(map)
+                .bindPopup("<b>HONEYPOT SERVER (YOU)</b><br>Status: Active<br>Monitoring...").openPopup();
+
+            L.circle(e.latlng, {
+                radius: e.accuracy / 2,
+                color: '#3b82f6',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.1
+            }).addTo(map);
+
+            document.getElementById('gps-status').innerText = "LOCKED";
+        }
+
+        function onLocationError(e) {
+            document.getElementById('gps-status').innerText = "DENIED (USING DEFAULT)";
+            // Fallback to Bangalore
+            L.marker([12.9716, 77.5946], { icon: userIcon }).addTo(map)
+                .bindPopup("<b>HONEYPOT SERVER</b><br>Loc: Bangalore (Fallback)").openPopup();
+        }
+
+        map.on('locationfound', onLocationFound);
+        map.on('locationerror', onLocationError);
 
 
-        // --- 3. Live Data Update ---
+        // --- 4. Live Data Update ---
         let lastAttackCount = 0;
 
-        // Map Coords: [Y, X]
-        // Delhi (North): Top 35% -> Y=650, Left 35% -> X=308
-        // Mumbai (West): Top 55% -> Y=450, Left 25% -> X=220
-        // Kolkata (East): Top 45% -> Y=550, Left 70% -> X=616
-        // Jamtara (Cntrl): Top 40% -> Y=600, Left 60% -> X=528
+        // REAL COORDINATES for Threats
         const threatLocations = [
-            [650, 308], // Delhi
-            [450, 220], // Mumbai
-            [550, 616], // Kolkata
-            [600, 528], // Jamtara
-            [300, 400], // South
+            { lat: 28.6139, lng: 77.2090, name: "New Delhi", state: "Delhi" },
+            { lat: 19.0760, lng: 72.8777, name: "Mumbai", state: "Maharashtra" },
+            { lat: 22.5726, lng: 88.3639, name: "Kolkata", state: "West Bengal" },
+            { lat: 24.1667, lng: 86.6000, name: "Jamtara", state: "Jharkhand (Hotspot)" },
+            { lat: 26.8467, lng: 80.9462, name: "Lucknow", state: "Uttar Pradesh" },
+            { lat: 12.9242, lng: 80.1292, name: "Tambaram", state: "Tamil Nadu" },
+            { lat: 23.0225, lng: 72.5714, name: "Ahmedabad", state: "Gujarat" }
         ];
 
         function updateStats() {
-            // Blink Sync Text
             const syncText = document.getElementById('sync-status');
             syncText.innerText = "SYNCING...";
 
@@ -350,13 +427,21 @@
                         setTimeout(() => mapPanel.classList.remove('flash-alert'), 3000);
 
                         // 2. Pick random location
-                        const loc = threatLocations[Math.floor(Math.random() * threatLocations.length)];
+                        const threat = threatLocations[Math.floor(Math.random() * threatLocations.length)];
 
-                        // 3. Add Marker to Map
-                        const marker = L.marker(loc, { icon: threatIcon }).addTo(map);
+                        // 3. Add PERSISTENT Marker to Map (Doesn't disappear)
+                        const marker = L.marker([threat.lat, threat.lng], { icon: threatIcon }).addTo(map);
 
-                        // Remove after 5s
-                        setTimeout(() => map.removeLayer(marker), 5000);
+                        // 4. Bind Popup with Details
+                        marker.bindPopup(`
+                            <div class="text-left">
+                                <b class="text-red-400">THREAT DETECTED</b><br>
+                                Loc: ${threat.name}<br>
+                                State: ${threat.state}<br>
+                                Coords: ${threat.lat}, ${threat.lng}<br>
+                                <span class="text-xs text-slate-400">Status: BLOCKED</span>
+                            </div>
+                        `).openPopup();
                     }
 
                     // Update Logs
