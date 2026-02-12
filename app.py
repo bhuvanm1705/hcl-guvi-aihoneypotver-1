@@ -1,4 +1,7 @@
 from flask import Flask, request, jsonify
+print("-----------------------------------")
+print("APPLICATION IS STARTING UP (DEBUG)")
+print("-----------------------------------")
 import os
 import json
 import re
