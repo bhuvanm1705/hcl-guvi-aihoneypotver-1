@@ -554,22 +554,38 @@ def honeypot_endpoint():
         # Process the message
         response = honeypot.process_message(session_id, message, conversation_history, metadata)
         
-        intel_count = (
-            len(session['extracted_intelligence'].bankAccounts) + 
-            len(session['extracted_intelligence'].upiIds) + 
-            len(session['extracted_intelligence'].phishingLinks) + 
-            len(session['extracted_intelligence'].phoneNumbers)
-        )
-        should_callback = session['scam_detected'] and (session['total_messages'] > 10 or intel_count >= 2)
+        # FIX: Fetch fresh state to avoid NameError and get updated debug info
+        fresh_session = database.get_session(session_id)
+        if fresh_session:
+            try:
+                 # Check if intel is dict or object (handle both cases for safety)
+                intel = fresh_session['extracted_intelligence']
+                if isinstance(intel, dict):
+                    intel_count = len(intel.get('bankAccounts', [])) + len(intel.get('upiIds', [])) + \
+                                  len(intel.get('phishingLinks', [])) + len(intel.get('phoneNumbers', []))
+                else:
+                    intel_count = len(intel.bankAccounts) + len(intel.upiIds) + \
+                                  len(intel.phishingLinks) + len(intel.phoneNumbers)
+                
+                debug_scam = fresh_session['scam_detected']
+                debug_callback = debug_scam and (fresh_session['total_messages'] > 10 or intel_count >= 2)
+            except:
+                intel_count = -1
+                debug_scam = False
+                debug_callback = False
+        else:
+            intel_count = 0
+            debug_scam = False
+            debug_callback = False
 
         return jsonify({
             "status": "success",
             "reply": response.get('reply'),
             "transcription": response.get('transcription'),
             "debug_headers": dict(request.headers),
-            "debug_is_scam": session['scam_detected'],
+            "debug_is_scam": debug_scam,
             "debug_intel_count": intel_count,
-            "debug_should_callback": should_callback
+            "debug_should_callback": debug_callback
         })
     
     except Exception as e:
