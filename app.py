@@ -556,27 +556,43 @@ def honeypot_endpoint():
         
         # FIX: Fetch fresh state to avoid NameError and get updated debug info
         fresh_session = database.get_session(session_id)
+        debug_error = None
         if fresh_session:
             try:
                  # Check if intel is dict or object (handle both cases for safety)
                 intel = fresh_session['extracted_intelligence']
+                
+                # If stored as JSON string (which it likely is in DB), parse it
+                if isinstance(intel, str):
+                    try:
+                        intel = json.loads(intel)
+                    except:
+                        pass # Keep as is if parsing fails
+                
+                # Now it should be a dict
                 if isinstance(intel, dict):
                     intel_count = len(intel.get('bankAccounts', [])) + len(intel.get('upiIds', [])) + \
                                   len(intel.get('phishingLinks', [])) + len(intel.get('phoneNumbers', []))
                 else:
-                    intel_count = len(intel.bankAccounts) + len(intel.upiIds) + \
-                                  len(intel.phishingLinks) + len(intel.phoneNumbers)
+                    # Fallback if somehow it's an object (unlikely via DB fetch)
+                    try:
+                        intel_count = len(intel.bankAccounts) + len(intel.upiIds) + \
+                                      len(intel.phishingLinks) + len(intel.phoneNumbers)
+                    except:
+                        intel_count = 0 
                 
                 debug_scam = fresh_session['scam_detected']
                 debug_callback = debug_scam and (fresh_session['total_messages'] > 10 or intel_count >= 2)
-            except:
+            except Exception as e:
                 intel_count = -1
                 debug_scam = False
                 debug_callback = False
+                debug_error = str(e)
         else:
             intel_count = 0
             debug_scam = False
             debug_callback = False
+            debug_error = "Session not found"
 
         return jsonify({
             "status": "success",
@@ -585,7 +601,8 @@ def honeypot_endpoint():
             "debug_headers": dict(request.headers),
             "debug_is_scam": debug_scam,
             "debug_intel_count": intel_count,
-            "debug_should_callback": debug_callback
+            "debug_should_callback": debug_callback,
+            "debug_error": debug_error
         })
     
     except Exception as e:
@@ -689,7 +706,7 @@ def api_stats():
             status_icon = "🔴"
             status_text = f"THREAT DETECTED ({scam_type})"
             high_risk_threats.append({
-                "origin": origin, "type": scam_type, "risk": risk_score, 
+                "id": s['session_id'], "origin": origin, "type": scam_type, "risk": risk_score, 
                 "tactics": tactics, "time": s['updated_at']
             })
         else:

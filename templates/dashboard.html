@@ -426,10 +426,20 @@
                         threatLayer.clearLayers();
                         if (data.active_threats && data.active_threats.length > 0) {
                             data.active_threats.forEach((threat, index) => {
-                                // Use deterministic random based on threat type/risk to keep marker stable
-                                // Simple hash: sum of risk + length of type
-                                const hash = (threat.risk + threat.type.length + index);
-                                const locIndex = hash % threats.length;
+                                // Use deterministic random using ID if available (added in recent API update)
+                                // or fallback to type/risk hash
+                                let hashVal = 0;
+                                if (threat.id) {
+                                    for (let i = 0; i < threat.id.length; i++) {
+                                        hashVal = ((hashVal << 5) - hashVal) + threat.id.charCodeAt(i);
+                                        hashVal |= 0; // Convert to 32bit integer
+                                    }
+                                    hashVal = Math.abs(hashVal);
+                                } else {
+                                    hashVal = (threat.risk + threat.type.length + index);
+                                }
+
+                                const locIndex = hashVal % threats.length;
                                 const loc = threats[locIndex];
 
                                 L.marker([loc.lat, loc.lng], { icon: icons.red }).addTo(threatLayer)
