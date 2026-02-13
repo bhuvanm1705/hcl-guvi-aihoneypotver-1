@@ -65,21 +65,26 @@
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #475569;
-            /* Lighter slate for better visibility */
+            background: #cbd5e1;
+            /* Max visibility */
             border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
+            background: #94a3b8;
         }
 
-        ::-webkit-scrollbar-track {
+        /* Specific class for containers */
+        .scrollbar-custom::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .scrollbar-custom::-webkit-scrollbar-track {
             background: #0f172a;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
+        .scrollbar-custom::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
             border-radius: 4px;
         }
 
@@ -334,7 +339,7 @@
                         <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                     </div>
                 </div>
-                <div class="p-3 overflow-y-auto font-mono text-[11px] space-y-1 flex-1 h-full scrollbar-thin"
+                <div class="p-3 overflow-y-auto font-mono text-[11px] space-y-1 flex-1 h-full scrollbar-custom"
                     id="activity-log">
                     <div class="text-slate-500">System initialized...</div>
                 </div>
@@ -342,7 +347,7 @@
 
             <div class="glass p-4 rounded-lg h-1/3 flex flex-col">
                 <h3 class="text-yellow-400 text-xs font-bold mb-3">EXTRACTED EVIDENCE</h3>
-                <div class="overflow-y-auto space-y-2 flex-1 scrollbar-thin" id="intel-list"></div>
+                <div class="overflow-y-auto space-y-2 flex-1 scrollbar-custom" id="intel-list"></div>
             </div>
         </div>
     </div>
@@ -407,6 +412,7 @@
         // --- Live Data ---
         let lastRiskScore = 0;
         let lastMsgCount = 0;
+        let lastThreatsHash = "";
 
         // Mock Threat Locations
         const threats = [
@@ -457,59 +463,63 @@
                         }
 
                         // Plot ALL Active Threats
-                        threatLayer.clearLayers();
-                        if (data.active_threats && data.active_threats.length > 0) {
-                            data.active_threats.forEach((threat, index) => {
-                                // Use deterministic random using ID if available (added in recent API update)
-                                // or fallback to type/risk hash
-                                let hashVal = 0;
-                                if (threat.id) {
-                                    for (let i = 0; i < threat.id.length; i++) {
-                                        hashVal = ((hashVal << 5) - hashVal) + threat.id.charCodeAt(i);
-                                        hashVal |= 0; // Convert to 32bit integer
+                        // Only redraw if data changed to prevent jitter
+                        const currentThreatsHash = JSON.stringify(data.active_threats || []);
+
+                        if (currentThreatsHash !== lastThreatsHash) {
+                            threatLayer.clearLayers();
+                            if (data.active_threats && data.active_threats.length > 0) {
+                                data.active_threats.forEach((threat, index) => {
+                                    // Use deterministic random using ID if available (added in recent API update)
+                                    // or fallback to type/risk hash
+                                    let hashVal = 0;
+                                    if (threat.id) {
+                                        for (let i = 0; i < threat.id.length; i++) {
+                                            hashVal = ((hashVal << 5) - hashVal) + threat.id.charCodeAt(i);
+                                            hashVal |= 0; // Convert to 32bit integer
+                                        }
+                                        hashVal = Math.abs(hashVal);
+                                    } else {
+                                        hashVal = (threat.risk + threat.type.length + index);
                                     }
-                                    hashVal = Math.abs(hashVal);
-                                } else {
-                                    hashVal = (threat.risk + threat.type.length + index);
-                                }
 
-                                const locIndex = hashVal % threats.length;
-                                const loc = threats[locIndex];
+                                    const locIndex = hashVal % threats.length;
+                                    const loc = threats[locIndex];
 
-                                L.marker([loc.lat, loc.lng], { icon: icons.red }).addTo(threatLayer)
-                                    .bindPopup(`<b>${threat.type}</b><br>Risk: ${threat.risk}<br>Loc: ${loc.name}`);
-                            });
+                                    L.marker([loc.lat, loc.lng], { icon: icons.red }).addTo(threatLayer)
+                                        .bindPopup(`<b>${threat.type}</b><br>Risk: ${threat.risk}<br>Loc: ${loc.name}`);
+                                });
+                            }
+
+                        } else {
+                            document.getElementById('scam-type-display').innerText = "MONITORING NETWORK...";
+                            document.getElementById('scam-type-display').className = "text-2xl font-bold text-slate-600 mb-1";
+                            document.getElementById('tactics-container').innerHTML = "";
+                            threatLayer.clearLayers();
                         }
+                        lastMsgCount = data.total_messages;
 
-                    } else {
-                        document.getElementById('scam-type-display').innerText = "MONITORING NETWORK...";
-                        document.getElementById('scam-type-display').className = "text-2xl font-bold text-slate-600 mb-1";
-                        document.getElementById('tactics-container').innerHTML = "";
-                        threatLayer.clearLayers();
-                    }
-                    lastMsgCount = data.total_messages;
+                        // 4. Logs
+                        const logContainer = document.getElementById('activity-log');
+                        logContainer.innerHTML = '';
+                        data.recent_logs.forEach(log => {
+                            const div = document.createElement('div');
+                            const color = log.is_scam ? (log.risk_score > 70 ? 'text-red-500 font-bold' : 'text-orange-400') : 'text-slate-400';
+                            div.className = `${color} border-b border-slate-800/50 pb-1 mb-1`;
+                            div.innerHTML = `<span class="opacity-50">${log.time}</span> ${log.message}`;
+                            logContainer.append(div);
+                        });
 
-                    // 4. Logs
-                    const logContainer = document.getElementById('activity-log');
-                    logContainer.innerHTML = '';
-                    data.recent_logs.forEach(log => {
-                        const div = document.createElement('div');
-                        const color = log.is_scam ? (log.risk_score > 70 ? 'text-red-500 font-bold' : 'text-orange-400') : 'text-slate-400';
-                        div.className = `${color} border-b border-slate-800/50 pb-1 mb-1`;
-                        div.innerHTML = `<span class="opacity-50">${log.time}</span> ${log.message}`;
-                        logContainer.append(div);
+                        // 5. Intel
+                        const intelList = document.getElementById('intel-list');
+                        intelList.innerHTML = '';
+                        data.recent_intelligence.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'bg-slate-900/80 p-2 rounded border-l-2 mb-1 ' + (item.type === 'UPI-ID' ? 'border-purple-500' : 'border-yellow-500');
+                            div.innerHTML = `<span class="text-[10px] text-slate-500 block">${item.type}</span><span class="text-xs font-mono text-white select-all break-all">${item.value}</span>`;
+                            intelList.append(div);
+                        });
                     });
-
-                    // 5. Intel
-                    const intelList = document.getElementById('intel-list');
-                    intelList.innerHTML = '';
-                    data.recent_intelligence.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'bg-slate-900/80 p-2 rounded border-l-2 mb-1 ' + (item.type === 'UPI-ID' ? 'border-purple-500' : 'border-yellow-500');
-                        div.innerHTML = `<span class="text-[10px] text-slate-500 block">${item.type}</span><span class="text-xs font-mono text-white select-all break-all">${item.value}</span>`;
-                        intelList.append(div);
-                    });
-                });
         }
         setInterval(updateStats, 1000);
         updateStats();
