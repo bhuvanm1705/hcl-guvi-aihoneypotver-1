@@ -348,6 +348,9 @@
         const map = L.map('interactive-map', { zoomControl: true, attributionControl: false }).setView([20.5937, 78.9629], 5);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
 
+        // Threat Layer
+        const threatLayer = L.layerGroup().addTo(map);
+
         // Bounds
         map.setMaxBounds([[5.0, 68.0], [38.0, 98.0]]);
         map.setMinZoom(4);
@@ -417,16 +420,26 @@
                         if (data.total_messages > lastMsgCount) {
                             document.getElementById('map-panel').classList.add('flash-alert');
                             setTimeout(() => document.getElementById('map-panel').classList.remove('flash-alert'), 1000);
-
-                            // Plot Threat
-                            const loc = threats[Math.floor(Math.random() * threats.length)];
-                            L.marker([loc.lat, loc.lng], { icon: icons.red }).addTo(map)
-                                .bindPopup(`<b>${data.latest_threat.type}</b><br>Risk: ${currentRisk}<br>Loc: ${loc.name}`).openPopup();
                         }
+
+                        // Plot ALL Active Threats
+                        threatLayer.clearLayers();
+                        if (data.active_threats && data.active_threats.length > 0) {
+                            data.active_threats.forEach(threat => {
+                                // Use random threat location logic if origin is unknown or generic
+                                // (In real app, use threat.origin -> GeoIP. Here we simulate for hackathon visuals)
+                                const loc = threats[Math.floor(Math.random() * threats.length)];
+
+                                L.marker([loc.lat, loc.lng], { icon: icons.red }).addTo(threatLayer)
+                                    .bindPopup(`<b>${threat.type}</b><br>Risk: ${threat.risk}<br>Loc: ${loc.name}`);
+                            });
+                        }
+
                     } else {
                         document.getElementById('scam-type-display').innerText = "MONITORING NETWORK...";
                         document.getElementById('scam-type-display').className = "text-2xl font-bold text-slate-600 mb-1";
                         document.getElementById('tactics-container').innerHTML = "";
+                        threatLayer.clearLayers();
                     }
                     lastMsgCount = data.total_messages;
 

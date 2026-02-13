@@ -554,11 +554,22 @@ def honeypot_endpoint():
         # Process the message
         response = honeypot.process_message(session_id, message, conversation_history, metadata)
         
+        intel_count = (
+            len(session['extracted_intelligence'].bankAccounts) + 
+            len(session['extracted_intelligence'].upiIds) + 
+            len(session['extracted_intelligence'].phishingLinks) + 
+            len(session['extracted_intelligence'].phoneNumbers)
+        )
+        should_callback = session['scam_detected'] and (session['total_messages'] > 10 or intel_count >= 2)
+
         return jsonify({
             "status": "success",
             "reply": response.get('reply'),
             "transcription": response.get('transcription'),
-            "debug_headers": dict(request.headers)
+            "debug_headers": dict(request.headers),
+            "debug_is_scam": session['scam_detected'],
+            "debug_intel_count": intel_count,
+            "debug_should_callback": should_callback
         })
     
     except Exception as e:
@@ -690,7 +701,9 @@ def api_stats():
         "total_intelligence": total_intelligence,
         "recent_logs": recent_logs[:20],
         "recent_intelligence": recent_intelligence[:15],
-        "latest_threat": latest_threat
+        "recent_intelligence": recent_intelligence[:15],
+        "latest_threat": latest_threat,
+        "active_threats": high_risk_threats[-10:] # Return last 10 active threats for map
     })
 
 if __name__ == '__main__':
