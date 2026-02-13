@@ -736,7 +736,7 @@ def api_stats():
         "recent_intelligence": recent_intelligence[:15],
         "recent_intelligence": recent_intelligence[:15],
         "latest_threat": latest_threat,
-        "active_threats": high_risk_threats[-10:] # Return last 10 active threats for map
+        "active_threats": high_risk_threats[:10] # Return Top 10 High Risk threats for map
     })
 
 if __name__ == '__main__':
