@@ -425,10 +425,12 @@
                         // Plot ALL Active Threats
                         threatLayer.clearLayers();
                         if (data.active_threats && data.active_threats.length > 0) {
-                            data.active_threats.forEach(threat => {
-                                // Use random threat location logic if origin is unknown or generic
-                                // (In real app, use threat.origin -> GeoIP. Here we simulate for hackathon visuals)
-                                const loc = threats[Math.floor(Math.random() * threats.length)];
+                            data.active_threats.forEach((threat, index) => {
+                                // Use deterministic random based on threat type/risk to keep marker stable
+                                // Simple hash: sum of risk + length of type
+                                const hash = (threat.risk + threat.type.length + index);
+                                const locIndex = hash % threats.length;
+                                const loc = threats[locIndex];
 
                                 L.marker([loc.lat, loc.lng], { icon: icons.red }).addTo(threatLayer)
                                     .bindPopup(`<b>${threat.type}</b><br>Risk: ${threat.risk}<br>Loc: ${loc.name}`);
@@ -460,7 +462,7 @@
                     data.recent_intelligence.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'bg-slate-900/80 p-2 rounded border-l-2 mb-1 ' + (item.type === 'UPI-ID' ? 'border-purple-500' : 'border-yellow-500');
-                        div.innerHTML = `<span class="text-[10px] text-slate-500 block">${item.type}</span><span class="text-xs font-mono text-white select-all">${item.value}</span>`;
+                        div.innerHTML = `<span class="text-[10px] text-slate-500 block">${item.type}</span><span class="text-xs font-mono text-white select-all break-all">${item.value}</span>`;
                         intelList.append(div);
                     });
                 });
