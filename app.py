@@ -725,8 +725,10 @@ def api_stats():
     # Dedup intel (simple set logic not enough for list of dicts, doing basic slice)
     recent_intelligence.reverse() 
     
-    # Get latest high risk threat for UI
-    latest_threat = high_risk_threats[-1] if high_risk_threats else None
+    # Sort high risk threats by risk (desc) and ID (asc) for stability in slicing and map
+    high_risk_threats.sort(key=lambda x: (-x['risk'], x.get('id', '')))
+    
+    latest_threat = high_risk_threats[0] if high_risk_threats else None
 
     return jsonify({
         "total_messages": total_messages,
